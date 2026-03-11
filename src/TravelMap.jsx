@@ -347,8 +347,10 @@ export default function TravelMap({ onBack }) {
               </button>
             ))}
           </div>
-          <div className="theme-row">
-            <button className="theme-btn" onClick={() => { toggle(); setMenuOpen(false); }}>{theme === "dark" ? "☀️" : "🌙"}</button>
+          <div className="theme-row" onClick={() => { toggle(); setMenuOpen(false); }} style={{cursor:"pointer"}}>
+            <button className="theme-btn" onClick={e => e.stopPropagation()}>
+              {theme === "dark" ? "☀️" : "🌙"}
+            </button>
             <span>{theme === "dark" ? "Tema chiaro" : "Tema scuro"}</span>
           </div>
         </div>
