@@ -14,8 +14,6 @@ const LANGUAGES = [
   { code: "es", label: "ES", flag: "🇪🇸" },
   { code: "de", label: "DE", flag: "🇩🇪" },
 ];
-const CONTINENT_KEYS = ["all", "asia", "europe", "america", "africa", "oceania"];
-const CATEGORY_KEYS  = ["all", "culture", "adventure", "nature", "food", "sea"];
 const LANG_KEYS      = ["it", "en", "fr", "es", "de"];
 const CAROUSEL_INTERVAL = 4500;
 
@@ -112,7 +110,7 @@ function PrivacyPage({ onBack }) {
       <p className="updated">Ultimo aggiornamento: marzo 2025</p>
 
       <h2>1. Titolare del trattamento</h2>
-      <p>Il blog <strong>viaggi·lontani</strong> è gestito a titolo personale.
+      <p>Il blog <strong>viaggiare·ontheroad</strong> è gestito a titolo personale.
         Contatto: <a href="mailto:ciao@viaggilontani.it">ciao@viaggilontani.it</a></p>
 
       <h2>2. Dati raccolti</h2>
@@ -880,6 +878,10 @@ export default function TravelBlog({ onMap }) {
   }, []);
 
   // ── derived ──
+  // Dynamic filter keys built from actual DB data (always includes "all")
+  const continentKeys = ["all", ...Array.from(new Set(posts.map(p => p.continent).filter(Boolean))).sort()];
+  const categoryKeys  = ["all", ...Array.from(new Set(posts.map(p => p.category).filter(Boolean))).sort()];
+
   const carouselPosts = [
     ...posts.filter(p => p.featured),
     ...posts.filter(p => !p.featured),
@@ -932,7 +934,7 @@ export default function TravelBlog({ onMap }) {
           <div className="header-inner">
 
             <div className="logo" onClick={() => navigate("blog")}>
-              <em>via</em>ggi·lontani
+              <em>viaggiare</em>·ontheroad
             </div>
 
             <div className="header-right">
@@ -1080,7 +1082,7 @@ export default function TravelBlog({ onMap }) {
               {/* FILTERS */}
               <div className="filters">
                 <span className="filter-label">{t("filter.continent")}</span>
-                {CONTINENT_KEYS.map(c => (
+                {continentKeys.map(c => (
                   <button
                     key={c}
                     className={`filter-btn${activeContinent === c ? " active" : ""}`}
@@ -1089,7 +1091,7 @@ export default function TravelBlog({ onMap }) {
                 ))}
                 <div className="filter-sep" />
                 <span className="filter-label">{t("filter.category")}</span>
-                {CATEGORY_KEYS.map(c => (
+                {categoryKeys.map(c => (
                   <button
                     key={c}
                     className={`filter-btn${activeCategory === c ? " active" : ""}`}
@@ -1130,7 +1132,7 @@ export default function TravelBlog({ onMap }) {
         <footer className="footer">
           <div className="footer-inner">
             <div className="footer-brand">
-              <div className="logo"><em>via</em>ggi·lontani</div>
+              <div className="logo"><em>viaggiare</em>·ontheroad</div>
               <p className="footer-tagline">Racconti di viaggio lenti, onesti e scritti con cura.</p>
             </div>
             <div className="footer-col">
@@ -1152,7 +1154,7 @@ export default function TravelBlog({ onMap }) {
             </div>
           </div>
           <div className="footer-bottom">
-            <span className="brand">© 2025 viaggi·lontani</span>
+            <span className="brand">© 2025 viaggiare·ontheroad</span>
             <a onClick={() => navigate("privacy")}>Privacy Policy</a>
           </div>
         </footer>

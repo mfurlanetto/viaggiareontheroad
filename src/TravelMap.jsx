@@ -571,7 +571,7 @@ export default function TravelMap({ onBack }) {
           <div className="header-inner">
 
             <div className="logo" onClick={goBack}>
-              <em>via</em>ggi·lontani
+              <em>viaggiare</em>·ontheroad
             </div>
 
             <div className="header-right">
