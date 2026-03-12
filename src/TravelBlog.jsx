@@ -327,45 +327,71 @@ const STYLES = `
     max-width: 1200px; margin: 0 auto;
     padding: 2.5rem 1.5rem 2rem;
   }
+  /* The key constraint: carousel must be a clean, zero-padding box.
+     overflow:hidden here is what clips the track — no leaking slides. */
   .carousel {
-    position: relative; border-radius: 8px;
-    overflow: hidden; height: 520px;
-    user-select: none; touch-action: pan-y;
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;        /* clips track — must have no padding */
+    height: 520px;
+    width: 100%;             /* explicit 100% so track inherits correctly */
+    user-select: none;
+    touch-action: pan-y;
   }
+  /* Track width = 100% of .carousel (not of a padded ancestor).
+     flex children each get min-width:100% of the track = exact slide width. */
   .carousel-track {
-    display: flex; width: 100%; height: 100%;
+    display: flex;
+    width: 100%;
+    height: 100%;
     transition: transform 0.65s cubic-bezier(0.4,0,0.2,1);
     will-change: transform;
   }
   .carousel-slide {
-    position: relative; min-width: 100%; height: 100%;
-    flex-shrink: 0; cursor: pointer; overflow: hidden;
+    position: relative;
+    /* min-width + flex-shrink:0 = each slide is exactly 100% of track width */
+    min-width: 100%;
+    max-width: 100%;
+    width: 100%;
+    height: 100%;
+    flex-shrink: 0;
+    cursor: pointer;
+    /* NO overflow:hidden here — the parent .carousel clips everything */
   }
   .carousel-slide img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  /* Hero overlay: reserve bottom space for dots (40px) so text never overlaps */
   .hero-overlay {
     position: absolute; inset: 0;
-    background: linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.05) 55%);
+    background: linear-gradient(to top, rgba(0,0,0,0.92) 0%, rgba(0,0,0,0.05) 60%);
     display: flex; flex-direction: column; justify-content: flex-end;
-    padding: 2.5rem 2.25rem; pointer-events: none;
+    /* padding-bottom must be > dot zone (bottom:1.25rem + dot height ~8px + gap) */
+    padding: 2.5rem 2.25rem 3.5rem;
+    pointer-events: none;
+    box-sizing: border-box;
   }
   .hero-tag {
     display: inline-block; background: var(--gold-btn); color: #1a1a18;
     font-size: 0.72rem; font-weight: 700; letter-spacing: 0.14em;
     text-transform: uppercase; padding: 0.28rem 0.8rem;
-    margin-bottom: 0.8rem; width: fit-content; border-radius: 2px;
+    margin-bottom: 0.65rem; width: fit-content; border-radius: 2px;
+    flex-shrink: 0;
   }
   .hero-title {
     font-family: 'Playfair Display', serif;
-    font-size: clamp(2rem, 1.5rem + 2vw, 2.75rem);
-    color: #fff; line-height: 1.12; margin-bottom: 0.5rem;
+    font-size: clamp(1.6rem, 1.2rem + 2vw, 2.75rem);
+    color: #fff; line-height: 1.12; margin-bottom: 0.4rem;
     text-shadow: 0 2px 16px rgba(0,0,0,0.5);
   }
   .hero-subtitle {
-    font-size: clamp(1rem, 0.9rem + 0.3vw, 1.1rem);
-    color: rgba(255,255,255,0.75); font-style: italic;
-    margin-bottom: 0.75rem; line-height: 1.5;
+    font-size: clamp(0.9rem, 0.8rem + 0.4vw, 1.05rem);
+    color: rgba(255,255,255,0.72); font-style: italic;
+    margin-bottom: 0.5rem; line-height: 1.45;
+    /* clamp lines on mobile so subtitle never pushes dots */
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden;
   }
-  .hero-meta { font-size: 0.85rem; color: rgba(255,255,255,0.5); }
+  .hero-meta { font-size: 0.82rem; color: rgba(255,255,255,0.48); flex-shrink: 0; }
 
   .carousel-arrow {
     position: absolute; top: 50%; transform: translateY(-50%);
@@ -380,8 +406,9 @@ const STYLES = `
   .carousel-arrow.prev { left: 1.1rem; }
   .carousel-arrow.next { right: 1.1rem; }
   .carousel-dots {
-    position: absolute; bottom: 1.5rem; left: 50%; transform: translateX(-50%);
+    position: absolute; bottom: 1.25rem; left: 50%; transform: translateX(-50%);
     display: flex; gap: 0.5rem; z-index: 10;
+    /* dots sit above the progress bar */
   }
   .carousel-dot {
     width: 8px; height: 8px; border-radius: 50%;
@@ -497,14 +524,109 @@ const STYLES = `
     border-bottom: 1px solid var(--border); flex-wrap: wrap;
   }
   .modal-text { font-size: 1rem; line-height: 1.9; color: var(--text2); white-space: pre-line; }
+  /* Light mode: dark fill + gold text */
   .modal-close {
     display: block; margin: 2rem auto 0;
-    padding: 0.8rem 2.5rem; background: var(--text); color: var(--gold-light);
-    border: none; font-size: 0.85rem; font-weight: 700;
+    padding: 0.8rem 2.5rem;
+    background: var(--text); color: var(--gold-light);
+    border: 1px solid transparent;
+    font-family: 'Lato', sans-serif;
+    font-size: 0.85rem; font-weight: 700;
     letter-spacing: 0.12em; text-transform: uppercase;
-    cursor: pointer; border-radius: 3px; transition: opacity 0.2s;
+    cursor: pointer; border-radius: 3px;
+    transition: background 0.2s, color 0.2s, border-color 0.2s;
   }
   .modal-close:hover { opacity: 0.8; }
+  /* Dark mode: transparent + gold border + gold text — much easier on the eye */
+  [data-theme="dark"] .modal-close {
+    background: transparent;
+    color: var(--gold-btn);
+    border-color: var(--gold-btn);
+  }
+  [data-theme="dark"] .modal-close:hover {
+    background: var(--gold-btn);
+    color: #0f0f0d;
+    opacity: 1;
+  }
+
+  /* ── GALLERY ── */
+  .gallery { margin: 2rem 0 0.5rem; }
+  .gallery-title {
+    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--text3); margin-bottom: 1rem;
+  }
+  .gallery-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  }
+  .gallery-thumb {
+    aspect-ratio: 4/3; overflow: hidden; border-radius: 3px;
+    cursor: pointer; position: relative; background: var(--bg2);
+  }
+  .gallery-thumb img {
+    width: 100%; height: 100%; object-fit: cover;
+    transition: transform 0.4s ease, opacity 0.2s;
+  }
+  .gallery-thumb:hover img { transform: scale(1.06); }
+  .gallery-thumb:hover .gallery-thumb-overlay { opacity: 1; }
+  .gallery-thumb-overlay {
+    position: absolute; inset: 0; background: rgba(0,0,0,0.35);
+    display: flex; align-items: center; justify-content: center;
+    opacity: 0; transition: opacity 0.2s;
+    font-size: 1.3rem; color: #fff;
+  }
+  /* first photo spans 2 columns */
+  .gallery-thumb:first-child { grid-column: span 2; aspect-ratio: 16/9; }
+
+  /* Lightbox */
+  .lightbox {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.96);
+    z-index: 400; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    animation: fadeIn 0.2s ease;
+  }
+  .lightbox-img-wrap {
+    position: relative; max-width: min(90vw, 1100px); width: 100%;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .lightbox-img {
+    max-width: 100%; max-height: 75vh;
+    object-fit: contain; border-radius: 3px;
+    display: block;
+  }
+  .lightbox-nav {
+    position: absolute; top: 50%; transform: translateY(-50%);
+    background: rgba(255,255,255,0.12); border: none; color: #fff;
+    width: 44px; height: 44px; border-radius: 50%; font-size: 1.1rem;
+    cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: background 0.2s;
+  }
+  .lightbox-nav:hover { background: rgba(255,255,255,0.25); }
+  .lightbox-nav.lb-prev { left: -56px; }
+  .lightbox-nav.lb-next { right: -56px; }
+  .lightbox-caption {
+    margin-top: 1rem; text-align: center;
+    color: rgba(255,255,255,0.65); font-style: italic; font-size: 0.95rem;
+    max-width: 600px; line-height: 1.5;
+  }
+  .lightbox-counter {
+    margin-top: 0.5rem; font-size: 0.78rem; color: rgba(255,255,255,0.35);
+    letter-spacing: 0.08em;
+  }
+  .lightbox-close {
+    position: absolute; top: 1.25rem; right: 1.5rem;
+    background: none; border: none; color: rgba(255,255,255,0.5);
+    font-size: 1.75rem; cursor: pointer; line-height: 1;
+    transition: color 0.2s;
+  }
+  .lightbox-close:hover { color: #fff; }
+
+  @media (max-width: 600px) {
+    .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+    .gallery-thumb:first-child { grid-column: span 2; }
+    .lightbox-nav.lb-prev { left: 0.25rem; }
+    .lightbox-nav.lb-next { right: 0.25rem; }
+    .lightbox-img { max-height: 60vh; }
+  }
 
   /* ── FOOTER ── */
   .footer {
@@ -602,13 +724,15 @@ const STYLES = `
   /* ── RESPONSIVE ── */
   @media (max-width: 900px) {
     .header { padding: 0 1.25rem; }
-    .nav-list { display: none; }       /* hidden on mobile — drawer takes over */
+    .nav-list { display: none; }
     .lang-switcher { display: none; }
     .theme-btn { display: none; }
     .menu-btn { display: flex; }
 
-    .carousel-wrap { padding: 1.5rem 1.25rem 1.25rem; }
+    /* overflow:hidden on wrap ensures no slide leaks past the padded container */
+    .carousel-wrap { padding: 1.25rem 1.25rem 1rem; overflow: hidden; }
     .carousel { height: 370px; }
+    .hero-overlay { padding: 2rem 1.75rem 3.25rem; }
 
     .section-divider { padding: 0 1.25rem; }
     .filters { padding: 0.85rem 1.25rem; }
@@ -623,9 +747,20 @@ const STYLES = `
   }
 
   @media (max-width: 600px) {
-    .carousel-wrap { padding: 0; overflow: hidden; }
-    .carousel { height: 285px; border-radius: 0; }
-    .hero-overlay { padding: 1.5rem 1.25rem; }
+    /* Full-bleed carousel: no padding, no border-radius, explicit width */
+    .carousel-wrap {
+      padding: 0;
+      overflow: hidden;   /* clips .carousel which clips .track */
+      max-width: 100vw;
+    }
+    .carousel { height: 285px; border-radius: 0; width: 100%; }
+    /* Overlay: pad bottom enough for dots (1.25rem bottom + 8px dot + 8px gap = ~2.5rem) */
+    .hero-overlay { padding: 1.25rem 1.1rem 3rem; }
+    /* Smaller text on small phones so title never overflows into dot zone */
+    .hero-title { font-size: clamp(1.35rem, 5vw, 1.75rem); margin-bottom: 0.25rem; }
+    .hero-subtitle { font-size: 0.85rem; margin-bottom: 0.25rem; -webkit-line-clamp: 1; }
+    .hero-meta { font-size: 0.78rem; }
+    .hero-tag { font-size: 0.68rem; margin-bottom: 0.5rem; }
     .carousel-arrow { display: none; }
 
     .section-divider { padding: 0 1rem; margin-top: 1.5rem; }
@@ -668,6 +803,11 @@ export default function TravelBlog({ onMap }) {
   const [menuOpen,        setMenuOpen]       = useState(false);
   const [page,            setPage]           = useState("blog"); // "blog" | "about" | "privacy"
 
+  // gallery images for open post
+  const [postImages,    setPostImages]   = useState([]);
+  const [galleryIdx,    setGalleryIdx]   = useState(0);
+  const [galleryOpen,   setGalleryOpen]  = useState(false);
+
   // carousel
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [paused,      setPaused]      = useState(false);
@@ -689,11 +829,24 @@ export default function TravelBlog({ onMap }) {
     })();
   }, []);
 
+  // fetch gallery images when a post is opened
+  useEffect(() => {
+    if (!selectedPost) { setPostImages([]); setGalleryIdx(0); setGalleryOpen(false); return; }
+    (async () => {
+      const { data } = await supabase
+        .from("post_images")
+        .select("*")
+        .eq("post_id", selectedPost.id)
+        .order("position", { ascending: true });
+      setPostImages(data || []);
+    })();
+  }, [selectedPost]);
+
   // lock body scroll when modal or drawer is open
   useEffect(() => {
-    document.body.style.overflow = (selectedPost || menuOpen) ? "hidden" : "";
+    document.body.style.overflow = (selectedPost || menuOpen || galleryOpen) ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [selectedPost, menuOpen]);
+  }, [selectedPost, menuOpen, galleryOpen]);
 
   // ── helpers ──
   const getT = (post) => {
@@ -1021,6 +1174,26 @@ export default function TravelBlog({ onMap }) {
                     <span>⏱ {selectedPost.read_time} {t("modal.read")}</span>
                   </div>
                   <p className="modal-text">{tr.body}</p>
+
+                  {/* ── GALLERY ── */}
+                  {postImages.length > 0 && (
+                    <div className="gallery">
+                      <div className="gallery-title">Galleria fotografica · {postImages.length} foto</div>
+                      <div className="gallery-grid">
+                        {postImages.map((img, i) => (
+                          <div
+                            key={img.id}
+                            className="gallery-thumb"
+                            onClick={() => { setGalleryIdx(i); setGalleryOpen(true); }}
+                          >
+                            <img src={img.url} alt={img.alt_text || img.caption || ""} loading="lazy" />
+                            <div className="gallery-thumb-overlay">⊕</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
                   <button className="modal-close" onClick={() => setSelectedPost(null)}>
                     {t("modal.back")}
                   </button>
@@ -1031,6 +1204,32 @@ export default function TravelBlog({ onMap }) {
         })()}
 
       </div>
+
+      {/* ── LIGHTBOX ── */}
+      {galleryOpen && postImages.length > 0 && (() => {
+        const img = postImages[galleryIdx];
+        const goPrev = (e) => { e.stopPropagation(); setGalleryIdx(i => (i - 1 + postImages.length) % postImages.length); };
+        const goNext = (e) => { e.stopPropagation(); setGalleryIdx(i => (i + 1) % postImages.length); };
+        return (
+          <div className="lightbox" onClick={() => setGalleryOpen(false)}>
+            <button className="lightbox-close" onClick={() => setGalleryOpen(false)}>✕</button>
+            <div className="lightbox-img-wrap" onClick={e => e.stopPropagation()}>
+              {postImages.length > 1 && (
+                <button className="lightbox-nav lb-prev" onClick={goPrev}>&#8592;</button>
+              )}
+              <img className="lightbox-img" src={img.url} alt={img.alt_text || img.caption || ""} />
+              {postImages.length > 1 && (
+                <button className="lightbox-nav lb-next" onClick={goNext}>&#8594;</button>
+              )}
+            </div>
+            {img.caption && <p className="lightbox-caption">{img.caption}</p>}
+            {postImages.length > 1 && (
+              <p className="lightbox-counter">{galleryIdx + 1} / {postImages.length}</p>
+            )}
+          </div>
+        );
+      })()}
+
     </>
   );
 }
