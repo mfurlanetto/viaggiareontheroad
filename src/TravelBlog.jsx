@@ -626,6 +626,34 @@ const STYLES = `
     .lightbox-img { max-height: 60vh; }
   }
 
+  /* ── PAGINATION ── */
+  .pagination {
+    display: flex; align-items: center; justify-content: center;
+    gap: 0.35rem; padding: 0 1.5rem 4rem; flex-wrap: wrap;
+  }
+  .page-btn {
+    min-width: 38px; height: 38px; padding: 0 0.6rem;
+    border: 1px solid var(--filter-border);
+    background: transparent; color: var(--text2);
+    font-family: 'Lato', sans-serif; font-size: 0.85rem; font-weight: 700;
+    border-radius: 3px; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.18s;
+  }
+  .page-btn:hover:not(:disabled) { border-color: var(--text); color: var(--text); }
+  .page-btn.active {
+    background: var(--text); color: var(--gold-light);
+    border-color: var(--text);
+  }
+  .page-btn:disabled { opacity: 0.3; cursor: default; }
+  .page-btn.prev-next { font-size: 1rem; letter-spacing: 0; }
+  .page-dots { color: var(--text3); padding: 0 0.2rem; line-height: 38px; font-size: 0.9rem; }
+
+  @media (max-width: 600px) {
+    .pagination { padding: 0 1rem 3rem; gap: 0.3rem; }
+    .page-btn { min-width: 34px; height: 34px; font-size: 0.8rem; }
+  }
+
   /* ── FOOTER ── */
   .footer {
     background: var(--footer-bg); color: var(--text3);
@@ -800,6 +828,7 @@ export default function TravelBlog({ onMap }) {
   const [selectedPost,    setSelectedPost]   = useState(null);
   const [menuOpen,        setMenuOpen]       = useState(false);
   const [page,            setPage]           = useState("blog"); // "blog" | "about" | "privacy"
+  const [currentPage,     setCurrentPage]    = useState(1);
 
   // gallery images for open post
   const [postImages,    setPostImages]   = useState([]);
@@ -812,6 +841,7 @@ export default function TravelBlog({ onMap }) {
   const [progress,    setProgress]    = useState(0);
   const progressRef = useRef(null);
   const touchStartX = useRef(null);
+  const gridRef     = useRef(null);
 
   // ── data ──
   useEffect(() => {
@@ -864,6 +894,9 @@ export default function TravelBlog({ onMap }) {
     return new Date(y, (m || 1) - 1).toLocaleDateString(lang, { month: "long", year: "numeric" });
   };
 
+  // Reset pagination when filters change
+  useEffect(() => { setCurrentPage(1); }, [activeContinent, activeCategory]);
+
   // ── navigation ──
   // Single source of truth: always call navigate() to change page.
   const navigate = useCallback((target) => {
@@ -891,6 +924,20 @@ export default function TravelBlog({ onMap }) {
     (activeContinent === "all" || p.continent === activeContinent) &&
     (activeCategory  === "all" || p.category  === activeCategory)
   );
+
+  // ── pagination ──
+  const PAGE_SIZE   = 6;
+  const totalPages  = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const safePage    = Math.min(currentPage, totalPages);
+  const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  const goToPage = (p) => {
+    setCurrentPage(p);
+    // Scroll to top of grid on mobile, smooth on desktop
+    if (gridRef.current) {
+      gridRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   // ── carousel logic ──
   const goTo = useCallback((idx) => {
@@ -1101,9 +1148,9 @@ export default function TravelBlog({ onMap }) {
               </div>
 
               {/* GRID */}
-              <div className="grid">
+              <div className="grid" ref={gridRef}>
                 {filtered.length === 0 && <div className="empty">{t("empty")}</div>}
-                {filtered.map(post => {
+                {paginated.map(post => {
                   const tr = getT(post);
                   return (
                     <article key={post.id} className="card" onClick={() => setSelectedPost(post)}>
@@ -1124,6 +1171,52 @@ export default function TravelBlog({ onMap }) {
                   );
                 })}
               </div>
+
+              {/* PAGINATION */}
+              {totalPages > 1 && (() => {
+                // Build page number list with ellipsis: always show first, last,
+                // current and its neighbours — everything else becomes "…"
+                const pages = [];
+                for (let i = 1; i <= totalPages; i++) {
+                  if (
+                    i === 1 || i === totalPages ||
+                    (i >= safePage - 1 && i <= safePage + 1)
+                  ) {
+                    pages.push(i);
+                  } else if (pages[pages.length - 1] !== "…") {
+                    pages.push("…");
+                  }
+                }
+                return (
+                  <div className="pagination">
+                    <button
+                      className="page-btn prev-next"
+                      onClick={() => goToPage(safePage - 1)}
+                      disabled={safePage === 1}
+                      aria-label="Pagina precedente"
+                    >←</button>
+
+                    {pages.map((p, i) =>
+                      p === "…"
+                        ? <span key={`dots-${i}`} className="page-dots">…</span>
+                        : <button
+                            key={p}
+                            className={`page-btn${p === safePage ? " active" : ""}`}
+                            onClick={() => goToPage(p)}
+                            aria-label={`Pagina ${p}`}
+                            aria-current={p === safePage ? "page" : undefined}
+                          >{p}</button>
+                    )}
+
+                    <button
+                      className="page-btn prev-next"
+                      onClick={() => goToPage(safePage + 1)}
+                      disabled={safePage === totalPages}
+                      aria-label="Pagina successiva"
+                    >→</button>
+                  </div>
+                );
+              })()}
             </>
           )
         )}
