@@ -1,96 +1,108 @@
--- Stato RLS di viaggiare·ontheroad e hardening.
--- Progetto Supabase "viaggiare-ontheroad" (eu-west-1).
--- 2026-11-06: stato iniziale verificato in sola lettura; i punti 1 e 2 qui sotto
--- sono stati APPLICATI come migrazione "rls_hardening_admin_only_writes"
--- (con <UUID-ADMIN> = unico utente Auth) e verificati: lettura pubblica dei soli post
--- pubblicati OK, scrittura anon bloccata, utente non admin bloccato, admin consentito.
--- Il punto 0 (disattivare le registrazioni) resta da fare dalla dashboard.
--- Il ripristino esatto dello stato iniziale e' al punto 4.
+-- Sicurezza del database di viaggiare·ontheroad
+-- Progetto Supabase "viaggiare-ontheroad" (eu-west-1). Stato verificato il 2026-11-06.
 --
--- Perche' conta: la chiave pubblica e' leggibile da chiunque dal bundle del sito;
--- cio' che protegge i dati e' la RLS, non il filtro .eq("published", true) del codice.
+-- Questo file DOCUMENTA cio' che e' gia' applicato al progetto (vedi la lista
+-- delle migrazioni in Dashboard > Database > Migrations) e come annullarlo.
+-- Non va rieseguito: le migrazioni sono gia' attive.
+-- <UUID-ADMIN> = id dell'unico utente amministratore (Authentication > Users).
+--
+-- Perche' conta: la chiave pubblica (publishable key) e' leggibile da chiunque nel
+-- bundle del sito; cio' che protegge i dati e' la RLS, non i filtri nel codice.
 -- Doc ufficiale: https://supabase.com/docs/guides/api/api-keys
 --
--- ───────────── STATO ATTUALE (osservato) ─────────────
--- * RLS attiva su public.posts e public.post_images.                       OK
--- * Lettura: posts solo con published = true; post_images solo se il post
---   e' pubblicato. Le bozze non sono leggibili con la chiave pubblica.      OK
--- * Scrittura: INSERT/UPDATE/DELETE su entrambe le tabelle sono consentiti a
---   QUALSIASI utente autenticato (auth.role() = 'authenticated' oppure true).
---   Oggi esiste un solo utente Auth, ma se le registrazioni sono aperte
---   chiunque puo' crearsi un account e poi modificare o cancellare i contenuti.
---                                                                          DA CORREGGERE
--- * Il ruolo anon ha tutti i privilegi sulle tabelle (default Supabase). La RLS
---   li limita, ma TRUNCATE non e' soggetto a RLS. Non e' raggiungibile dall'API
---   REST, ma e' meglio toglierlo (difesa in profondita').                   CONSIGLIATO
--- * Advisor di sicurezza: "Leaked Password Protection Disabled" (WARN).
---   https://supabase.com/docs/guides/auth/password-security#password-strength-and-leaked-password-protection
+-- ───────────── STATO ATTUALE ─────────────
+-- Tabelle public.posts e public.post_images (RLS attiva su entrambe)
+--   * anon: solo SELECT; legge i post con published = true e le immagini dei
+--     post pubblicati.
+--   * authenticated: SELECT/INSERT/UPDATE/DELETE solo se auth.uid() = <UUID-ADMIN>
+--     (l'admin vede anche le bozze).
+--   * posts.published: NOT NULL, default false (un post nuovo nasce bozza).
+--   * posts.lat / posts.lng: coordinate per la mappa (nullable, con CHECK di range).
 --
--- ───────────── PROPOSTE ─────────────
--- 0) Dashboard (la mossa piu' efficace, senza SQL): Authentication > Sign In /
---    Providers > disattiva "Allow new users to sign up". Con un solo utente
---    amministratore, nessun altro potra' registrarsi.
+-- Storage, bucket "post-images" (pubblico: i file si leggono tramite URL pubblico)
+--   * Elenco, upload, modifica e cancellazione dei file solo per <UUID-ADMIN>.
+--   * Limite 10 MB per file; tipi ammessi: image/jpeg, image/png, image/webp, image/avif.
+--   * La dashboard Supabase usa la service role e non e' soggetta a queste policy,
+--     ma limite di dimensione e tipi valgono anche li'.
 --
--- 1) Togliere ad anon (e a authenticated) i privilegi non usati.
---    Dopo questo, anon puo' solo leggere (SELECT), comunque filtrato dalla RLS.
+-- Auth e chiavi (impostazioni dalla dashboard, non SQL)
+--   * Registrazioni pubbliche disattivate.
+--   * Chiavi JWT legacy disattivate (anon verificata disabled); il sito usa la
+--     publishable key (sb_publishable_...).
+--   * DA FARE: "Leaked password protection" e' disattivata (advisor WARN):
+--     https://supabase.com/docs/guides/auth/password-security
+--
+-- ───────────── MIGRAZIONI APPLICATE ─────────────
+-- 1) rls_hardening_admin_only_writes
+--    Revoca ad anon di INSERT/UPDATE/DELETE/TRUNCATE/REFERENCES/TRIGGER e ad
+--    authenticated di TRUNCATE/REFERENCES/TRIGGER; policy di scrittura e di
+--    lettura completa solo per <UUID-ADMIN> su posts e post_images.
+--
+-- 2) storage_post_images_admin_only
+--    Sostituite le policy "Immagini pubbliche" (elenco aperto a tutti),
+--    "Upload autenticati" e "Delete autenticati" (qualsiasi utente loggato) con:
 
-revoke insert, update, delete, truncate, references, trigger on public.posts       from anon;
-revoke insert, update, delete, truncate, references, trigger on public.post_images from anon;
-revoke truncate, references, trigger on public.posts       from authenticated;
-revoke truncate, references, trigger on public.post_images from authenticated;
-
--- 2) Scrittura solo per l'amministratore (non per qualunque utente autenticato).
---    Sostituisci <UUID-ADMIN> con l'id del tuo utente: Authentication > Users.
---    Finche' resta il segnaposto, lo script fallisce: e' voluto.
---    Se le modifiche le fai solo dalla dashboard/SQL editor (service role), che
---    bypassano la RLS, queste policy non cambiano il tuo flusso di lavoro.
-
-drop policy if exists "Insert autenticato"                  on public.posts;
-drop policy if exists "Update autenticato"                  on public.posts;
-drop policy if exists "Delete autenticato"                  on public.posts;
-drop policy if exists "authenticated can insert post images" on public.post_images;
-drop policy if exists "authenticated can update post images" on public.post_images;
-drop policy if exists "authenticated can delete post images" on public.post_images;
-
-create policy "Admin legge tutti i post" on public.posts
+create policy "post-images: admin legge/elenca" on storage.objects
   for select to authenticated
-  using ((select auth.uid()) = '<UUID-ADMIN>'::uuid);   -- vede anche le bozze
-create policy "Admin inserisce post" on public.posts
+  using (bucket_id = 'post-images' and (select auth.uid()) = '<UUID-ADMIN>'::uuid);
+create policy "post-images: admin carica" on storage.objects
   for insert to authenticated
-  with check ((select auth.uid()) = '<UUID-ADMIN>'::uuid);
-create policy "Admin modifica post" on public.posts
+  with check (bucket_id = 'post-images' and (select auth.uid()) = '<UUID-ADMIN>'::uuid);
+create policy "post-images: admin modifica" on storage.objects
   for update to authenticated
-  using      ((select auth.uid()) = '<UUID-ADMIN>'::uuid)
-  with check ((select auth.uid()) = '<UUID-ADMIN>'::uuid);
-create policy "Admin elimina post" on public.posts
+  using      (bucket_id = 'post-images' and (select auth.uid()) = '<UUID-ADMIN>'::uuid)
+  with check (bucket_id = 'post-images' and (select auth.uid()) = '<UUID-ADMIN>'::uuid);
+create policy "post-images: admin elimina" on storage.objects
   for delete to authenticated
-  using ((select auth.uid()) = '<UUID-ADMIN>'::uuid);
+  using (bucket_id = 'post-images' and (select auth.uid()) = '<UUID-ADMIN>'::uuid);
+update storage.buckets
+   set file_size_limit = 10485760,
+       allowed_mime_types = array['image/jpeg','image/png','image/webp','image/avif']
+ where id = 'post-images';
 
-create policy "Admin legge tutte le immagini" on public.post_images
-  for select to authenticated
-  using ((select auth.uid()) = '<UUID-ADMIN>'::uuid);
-create policy "Admin inserisce immagini" on public.post_images
-  for insert to authenticated
-  with check ((select auth.uid()) = '<UUID-ADMIN>'::uuid);
-create policy "Admin modifica immagini" on public.post_images
-  for update to authenticated
-  using      ((select auth.uid()) = '<UUID-ADMIN>'::uuid)
-  with check ((select auth.uid()) = '<UUID-ADMIN>'::uuid);
-create policy "Admin elimina immagini" on public.post_images
-  for delete to authenticated
-  using ((select auth.uid()) = '<UUID-ADMIN>'::uuid);
+-- 3) posts_published_default_false
+alter table public.posts alter column published set default false;
+alter table public.posts alter column published set not null;
+--    + il post "Cina" (id 21ea82d1-...), senza data, immagine e testi, riportato a bozza.
 
--- 3) Verifica dopo l'esecuzione (SQL editor):
---    set role anon;
---    select count(*) from public.posts where published = false;   -- atteso 0
---    insert into public.posts (continent, category, date, read_time)
---      values ('x', 'x', 'x', 1);                                  -- atteso: permission denied
---    reset role;
+-- 4) posts_add_lat_lng
+alter table public.posts add column if not exists lat double precision;
+alter table public.posts add column if not exists lng double precision;
+alter table public.posts add constraint posts_lat_range check (lat is null or lat between -90 and 90);
+alter table public.posts add constraint posts_lng_range check (lng is null or lng between -180 and 180);
+--    + popolate con le coordinate prima scritte in src/TravelMap.jsx.
+
+-- ───────────── VERIFICHE (SQL editor) ─────────────
+--   set role anon;
+--   select count(*) from public.posts where published = false;   -- atteso 0
+--   insert into public.posts (continent, category, date, read_time)
+--     values ('x', 'x', 'x', 1);                                  -- atteso: permission denied
+--   insert into storage.objects (bucket_id, name)
+--     values ('post-images', 'x.jpg');                            -- atteso: permission denied
+--   reset role;
 --
--- 4) Ripristino dello stato iniziale (da eseguire solo se serve tornare indietro).
---    Riporta le policy e i privilegi com'erano prima della migrazione.
+-- ───────────── RIPRISTINO (solo se serve tornare indietro) ─────────────
+-- 4) drop delle colonne: il frontend tollera la loro assenza (ripiega su select *),
+--    ma la mappa restera' vuota.
+--    alter table public.posts drop column lat, drop column lng;
 --
---    drop policy if exists "Admin legge tutti i post"        on public.posts;
+-- 3) alter table public.posts alter column published drop not null;
+--    alter table public.posts alter column published set default true;
+--
+-- 2) drop policy if exists "post-images: admin legge/elenca" on storage.objects;
+--    drop policy if exists "post-images: admin carica"       on storage.objects;
+--    drop policy if exists "post-images: admin modifica"     on storage.objects;
+--    drop policy if exists "post-images: admin elimina"      on storage.objects;
+--    create policy "Immagini pubbliche" on storage.objects for select to public
+--      using (bucket_id = 'post-images');
+--    create policy "Upload autenticati" on storage.objects for insert to public
+--      with check (bucket_id = 'post-images' and auth.role() = 'authenticated');
+--    create policy "Delete autenticati" on storage.objects for delete to public
+--      using (bucket_id = 'post-images' and auth.role() = 'authenticated');
+--    update storage.buckets set file_size_limit = null, allowed_mime_types = null
+--      where id = 'post-images';
+--
+-- 1) drop policy if exists "Admin legge tutti i post"        on public.posts;
 --    drop policy if exists "Admin inserisce post"            on public.posts;
 --    drop policy if exists "Admin modifica post"             on public.posts;
 --    drop policy if exists "Admin elimina post"              on public.posts;
@@ -98,7 +110,6 @@ create policy "Admin elimina immagini" on public.post_images
 --    drop policy if exists "Admin inserisce immagini"        on public.post_images;
 --    drop policy if exists "Admin modifica immagini"         on public.post_images;
 --    drop policy if exists "Admin elimina immagini"          on public.post_images;
---
 --    create policy "Insert autenticato" on public.posts for insert to public
 --      with check (auth.role() = 'authenticated'::text);
 --    create policy "Update autenticato" on public.posts for update to public
@@ -111,6 +122,5 @@ create policy "Admin elimina immagini" on public.post_images
 --      for update to authenticated using (true);
 --    create policy "authenticated can delete post images" on public.post_images
 --      for delete to authenticated using (true);
---
 --    grant all on public.posts, public.post_images to anon;
 --    grant truncate, references, trigger on public.posts, public.post_images to authenticated;
