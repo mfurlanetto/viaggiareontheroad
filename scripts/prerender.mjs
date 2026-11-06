@@ -1,6 +1,6 @@
 // Pre-render delle pagine dopo `vite build`, in tutte le lingue.
 //
-// Per ogni lingua (italiano senza prefisso, poi /en, /fr, /es, /de) genera:
+// Per ogni lingua (italiano senza prefisso, inglese con /en) genera:
 // - articoli/<slug>.html per ogni post pubblicato con testo in quella lingua,
 //   con title, description, canonical, hreflang, Open Graph/Twitter, JSON-LD
 //   BlogPosting e il testo dell'articolo gia' nell'HTML;
@@ -18,11 +18,8 @@ import { loadEnv } from "vite";
 import { SITE_URL, SITE_NAME, LANGS, DEFAULT_LANG, LANG_INFO } from "../src/config.js";
 import it from "../src/locales/it.js";
 import en from "../src/locales/en.js";
-import fr from "../src/locales/fr.js";
-import es from "../src/locales/es.js";
-import de from "../src/locales/de.js";
 
-const T = { it, en, fr, es, de };
+const T = { it, en };
 const DEFAULT_IMAGE = `${SITE_URL}/og-image.jpg`;
 const DIST = path.resolve("dist");
 

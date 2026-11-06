@@ -3,7 +3,7 @@ import { LANGS, DEFAULT_LANG } from "./config";
 
 // Router minimale basato sulla History API, senza dipendenze esterne.
 // URL: [/<lingua>]/, /articoli/<slug>, /chi-siamo, /privacy, /mappa.
-// L'italiano non ha prefisso; le altre lingue sono /en, /fr, /es, /de.
+// L'italiano non ha prefisso; l'inglese usa /en.
 // Le stesse route sono pre-renderizzate alla build (scripts/prerender.mjs).
 
 const prefix = (lang) => (lang === DEFAULT_LANG ? "" : `/${lang}`);

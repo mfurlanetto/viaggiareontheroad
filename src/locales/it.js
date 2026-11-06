@@ -1,5 +1,5 @@
 // Testi dell'interfaccia in italiano (lingua principale).
-// Le chiavi sono le stesse in tutte le lingue: vedi en.js, fr.js, es.js, de.js.
+// Le chiavi sono le stesse in tutte le lingue: vedi en.js.
 export default {
   nav: { destinations: "Destinazioni", stories: "Storie", map: "Mappa", about: "Chi siamo", menu: "Apri il menu", closeMenu: "Chiudi il menu" },
   a11y: {

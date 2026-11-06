@@ -1,6 +1,8 @@
 import { supabase } from "./supabaseClient";
 
-const LANGS = ["it", "en", "fr", "es", "de"];
+import { LANGS } from "./config";
+
+// Solo le colonne delle lingue del sito (le colonne *_fr/_es/_de restano nel DB ma non si usano).
 const perLang = (name) => LANGS.map(l => `${name}_${l}`);
 
 // Colonne usate da griglia, carosello, About e mappa. Il corpo degli articoli
