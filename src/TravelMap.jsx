@@ -14,19 +14,6 @@ import { useTheme } from "./useTheme";
 // ─────────────────────────────────────────────
 // CONSTANTS — module scope, never recreated
 // ─────────────────────────────────────────────
-const DESTINATION_COORDS = {
-  "Giappone": [35.6762, 139.6503], "Japan": [35.6762, 139.6503],
-  "Japón": [35.6762, 139.6503], "Japon": [35.6762, 139.6503],
-  "Argentina": [-41.1335, -71.3103], "Argentinien": [-41.1335, -71.3103],
-  "Marocco": [31.7917, -7.0926], "Morocco": [31.7917, -7.0926],
-  "Maroc": [31.7917, -7.0926], "Marruecos": [31.7917, -7.0926], "Marokko": [31.7917, -7.0926],
-  "Islanda": [64.9631, -19.0208], "Iceland": [64.9631, -19.0208],
-  "Islande": [64.9631, -19.0208], "Island": [64.9631, -19.0208],
-  "Vietnam": [14.0583, 108.2772],
-  "Grecia": [36.3932, 25.4615], "Greece": [36.3932, 25.4615],
-  "Grèce": [36.3932, 25.4615], "Griechenland": [36.3932, 25.4615],
-};
-
 const CATEGORY_COLORS = {
   culture: "#c9a84c", adventure: "#e07b4a",
   nature: "#5a9e6f", food: "#c0564b", sea: "#4a7eb5",
@@ -383,6 +370,8 @@ const STYLES = `
     border-bottom: 1px solid var(--border); flex-wrap: wrap;
   }
   .modal-text { font-size: 1rem; line-height: 1.9; color: var(--text2); white-space: pre-line; }
+  .modal-status { color: var(--text3); font-style: italic; }
+  .error-banner { max-width: 1400px; margin: 0 auto 1.25rem; padding: 1rem 2rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404; }
   .modal-close {
     display: block; margin: 2rem auto 0;
     padding: 0.8rem 2.5rem; background: var(--text); color: var(--gold-light);
@@ -477,14 +466,16 @@ export default function TravelMap({ onBack }) {
   const [flyTarget,      setFlyTarget]     = useState(null);
   const [activeCategory, setActiveCategory]= useState(null);
   const [menuOpen,       setMenuOpen]      = useState(false);
+  const [error,          setError]         = useState(null);
   // articolo aperto con testo completo (caricato solo all'apertura)
-  const openPost = usePostBody(selectedPost);
+  const [openPost, bodyStatus] = usePostBody(selectedPost);
 
   // fetch
   useEffect(() => {
     (async () => {
-      const { data } = await fetchPublishedPosts();
-      setPosts(data || []);
+      const { data, error } = await fetchPublishedPosts();
+      if (error) setError(error.message);
+      else setPosts(data || []);
       setLoading(false);
     })();
   }, []);
@@ -513,8 +504,10 @@ export default function TravelMap({ onBack }) {
     };
   };
 
+  // Coordinate salvate nel DB (colonne lat/lng). Un post senza coordinate
+  // non compare sulla mappa, ma resta nel blog.
   const getCoords = (post) =>
-    DESTINATION_COORDS[post.destination_it || post.destination_en || ""] || null;
+    Number.isFinite(post.lat) && Number.isFinite(post.lng) ? [post.lat, post.lng] : null;
 
   const formatDate = (d) => {
     if (!d) return "";
@@ -651,6 +644,10 @@ export default function TravelMap({ onBack }) {
           </div>
         </div>
 
+        {error && (
+          <div className="error-banner" role="alert">⚠️ Impossibile caricare i viaggi: {error}</div>
+        )}
+
         {/* ── LEGEND ── */}
         <div className="legend">
           <span className="legend-label">Filtra:</span>
@@ -678,8 +675,8 @@ export default function TravelMap({ onBack }) {
               style={{ height: "100%", width: "100%" }}
             >
               <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution="&copy; OpenStreetMap"
+                url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               />
               <MapFlyTo coords={flyTarget} />
               {filtered.map(post => {
@@ -773,7 +770,9 @@ export default function TravelMap({ onBack }) {
                     <span>🌍 {t(`continents.${selectedPost.continent}`)}</span>
                     <span>⏱ {selectedPost.read_time} {t("modal.read")}</span>
                   </div>
-                  <p className="modal-text">{tr.body}</p>
+                  {bodyStatus === "loading" && <p className="modal-text modal-status">Caricamento del testo…</p>}
+                  {bodyStatus === "error" && <p className="modal-text modal-status">Non è stato possibile caricare il testo dell'articolo. Riprova più tardi.</p>}
+                  {bodyStatus === "ready" && <p className="modal-text">{tr.body}</p>}
                   <button className="modal-close" onClick={() => setSelectedPost(null)}>
                     {t("modal.back")}
                   </button>

@@ -544,6 +544,7 @@ const STYLES = `
     border-bottom: 1px solid var(--border); flex-wrap: wrap;
   }
   .modal-text { font-size: 1rem; line-height: 1.9; color: var(--text2); white-space: pre-line; }
+  .modal-status { color: var(--text3); font-style: italic; }
   /* Light mode: dark fill + gold text */
   .modal-close {
     display: block; margin: 2rem auto 0;
@@ -862,7 +863,7 @@ export default function TravelBlog({ onMap }) {
     ? galleryData.images
     : [];
   // articolo aperto con testo completo (caricato solo all'apertura)
-  const openPost = usePostBody(selectedPost);
+  const [openPost, bodyStatus] = usePostBody(selectedPost);
 
   // carousel
   const [carouselIdx, setCarouselIdx] = useState(0);
@@ -928,14 +929,16 @@ export default function TravelBlog({ onMap }) {
 
   // ── navigation ──
   // Single source of truth: always call navigate() to change page.
-  const navigate = useCallback((target) => {
+  // Per il blog si puo' passare una categoria iniziale (es. "Storie" = cultura):
+  // i filtri vengono impostati qui, in un solo punto, cosi' non si sovrascrivono.
+  const navigate = useCallback((target, { category = "all" } = {}) => {
     setPage(target);
     setMenuOpen(false);
     setSelectedPost(null);
     setGalleryOpen(false);
     if (target === "blog") {
       setActiveContinent("all");
-      setActiveCategory("all");
+      setActiveCategory(category);
     }
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
@@ -1008,7 +1011,7 @@ export default function TravelBlog({ onMap }) {
               {/* Desktop nav — inline, no sub-component */}
               <ul className="nav-list">
                 <li><a onClick={() => navigate("blog")}>{t("nav.destinations")}</a></li>
-                <li><a onClick={() => { setActiveCategory("culture"); setPage("blog"); window.scrollTo({top:0,behavior:"instant"}); }}>{t("nav.stories")}</a></li>
+                <li><a onClick={() => navigate("blog", { category: "culture" })}>{t("nav.stories")}</a></li>
                 <li><a onClick={() => onMap?.()}>🗺 Mappa</a></li>
                 <li><a onClick={() => navigate("about")}>Chi siamo</a></li>
               </ul>
@@ -1039,7 +1042,7 @@ export default function TravelBlog({ onMap }) {
           {/* Inline nav links — no sub-component, direct navigate() calls */}
           <ul className="nav-list">
             <li><a onClick={() => navigate("blog")}>{t("nav.destinations")}</a></li>
-            <li><a onClick={() => { setActiveCategory("culture"); navigate("blog"); }}>{t("nav.stories")}</a></li>
+            <li><a onClick={() => navigate("blog", { category: "culture" })}>{t("nav.stories")}</a></li>
             <li><a onClick={() => { setMenuOpen(false); onMap?.(); }}>🗺 Mappa</a></li>
             <li><a onClick={() => navigate("about")}>Chi siamo</a></li>
           </ul>
@@ -1259,8 +1262,8 @@ export default function TravelBlog({ onMap }) {
               <ul>
                 <li><a onClick={() => navigate("blog")}>Tutti i viaggi</a></li>
                 <li><a onClick={() => onMap?.()}>Mappa interattiva</a></li>
-                <li><a onClick={() => { setActiveCategory("culture"); setPage("blog"); }}>Cultura</a></li>
-                <li><a onClick={() => { setActiveCategory("nature");  setPage("blog"); }}>Natura</a></li>
+                <li><a onClick={() => navigate("blog", { category: "culture" })}>Cultura</a></li>
+                <li><a onClick={() => navigate("blog", { category: "nature" })}>Natura</a></li>
               </ul>
             </div>
             <div className="footer-col">
@@ -1295,7 +1298,9 @@ export default function TravelBlog({ onMap }) {
                     <span>🌍 {t(`continents.${selectedPost.continent}`)}</span>
                     <span>⏱ {selectedPost.read_time} {t("modal.read")}</span>
                   </div>
-                  <p className="modal-text">{tr.body}</p>
+                  {bodyStatus === "loading" && <p className="modal-text modal-status">Caricamento del testo…</p>}
+                  {bodyStatus === "error" && <p className="modal-text modal-status">Non è stato possibile caricare il testo dell'articolo. Riprova più tardi.</p>}
+                  {bodyStatus === "ready" && <p className="modal-text">{tr.body}</p>}
 
                   {/* ── GALLERY ── */}
                   {postImages.length > 0 && (
