@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import "./i18n";
 import { supabase } from "./supabaseClient";
+import { fetchPublishedPosts } from "./postsApi";
+import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
 
 // ─────────────────────────────────────────────
@@ -415,10 +417,12 @@ const STYLES = `
   }
   .carousel-dot.active { background: var(--gold-btn); width: 24px; border-radius: 4px; }
   .carousel-progress {
-    position: absolute; bottom: 0; left: 0; height: 3px;
+    position: absolute; bottom: 0; left: 0; height: 3px; width: 100%;
     background: var(--gold-btn); z-index: 10; opacity: 0.75;
-    transition: width linear;
+    transform-origin: left; transform: scaleX(0);
+    animation: carouselProgress linear forwards;
   }
+  @keyframes carouselProgress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
   /* ── SECTION DIVIDER ── */
   .section-divider {
@@ -839,12 +843,12 @@ export default function TravelBlog({ onMap }) {
   const postImages = selectedPost && galleryData.postId === selectedPost.id
     ? galleryData.images
     : [];
+  // articolo aperto con testo completo (caricato solo all'apertura)
+  const openPost = usePostBody(selectedPost);
 
   // carousel
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [paused,      setPaused]      = useState(false);
-  const [progress,    setProgress]    = useState(0);
-  const progressRef = useRef(null);
   const touchStartX = useRef(null);
   const gridRef     = useRef(null);
 
@@ -852,10 +856,7 @@ export default function TravelBlog({ onMap }) {
   useEffect(() => {
     (async () => {
       setLoading(true); setError(null);
-      const { data, error } = await supabase
-        .from("posts").select("*")
-        .eq("published", true)
-        .order("created_at", { ascending: false });
+      const { data, error } = await fetchPublishedPosts();
       if (error) setError(error.message);
       else setPosts(data || []);
       setLoading(false);
@@ -953,22 +954,13 @@ export default function TravelBlog({ onMap }) {
   // ── carousel logic ──
   const goTo = useCallback((idx) => {
     setCarouselIdx((idx + carouselPosts.length) % carouselPosts.length);
-    setProgress(0);
   }, [carouselPosts.length]);
 
   const next = useCallback(() => goTo(carouselIdx + 1), [carouselIdx, goTo]);
   const prev = useCallback(() => goTo(carouselIdx - 1), [carouselIdx, goTo]);
 
-  useEffect(() => {
-    if (paused || carouselPosts.length < 2) return;
-    const start = Date.now();
-    progressRef.current = setInterval(() => {
-      const elapsed = Date.now() - start;
-      setProgress(Math.min((elapsed / CAROUSEL_INTERVAL) * 100, 100));
-      if (elapsed >= CAROUSEL_INTERVAL) next();
-    }, 30);
-    return () => clearInterval(progressRef.current);
-  }, [carouselIdx, paused, next, carouselPosts.length]);
+  // L'avanzamento automatico e' guidato dall'animazione CSS della barra di
+  // progresso (onAnimationEnd): nessun timer JS e nessun re-render a 30 ms.
 
   const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
   const onTouchEnd   = (e) => {
@@ -1082,7 +1074,7 @@ export default function TravelBlog({ onMap }) {
                   <div
                     className="carousel"
                     onMouseEnter={() => setPaused(true)}
-                    onMouseLeave={() => { setProgress(0); setPaused(false); }}
+                    onMouseLeave={() => setPaused(false)}
                     onTouchStart={onTouchStart}
                     onTouchEnd={onTouchEnd}
                   >
@@ -1123,8 +1115,14 @@ export default function TravelBlog({ onMap }) {
                       ))}
                     </div>
 
-                    {!paused && (
-                      <div className="carousel-progress" style={{ width: `${progress}%`, transitionDuration: "30ms" }} />
+                    {/* key = slide corrente: a ogni cambio l'animazione riparte da zero */}
+                    {!paused && carouselPosts.length > 1 && (
+                      <div
+                        key={carouselIdx}
+                        className="carousel-progress"
+                        style={{ animationDuration: `${CAROUSEL_INTERVAL}ms` }}
+                        onAnimationEnd={next}
+                      />
                     )}
                   </div>
                 </div>
@@ -1263,7 +1261,8 @@ export default function TravelBlog({ onMap }) {
         </footer>
 
         {/* ── ARTICLE MODAL ── */}
-        {selectedPost && (() => {
+        {openPost && (() => {
+          const selectedPost = openPost; // con il testo completo, se gia' caricato
           const tr = getT(selectedPost);
           return (
             <div className="modal-overlay" onClick={() => setSelectedPost(null)}>

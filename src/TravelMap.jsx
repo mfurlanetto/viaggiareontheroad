@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
 import "./i18n";
-import { supabase } from "./supabaseClient";
+import { fetchPublishedPosts } from "./postsApi";
+import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
 
 // ─────────────────────────────────────────────
@@ -483,14 +484,13 @@ export default function TravelMap({ onBack }) {
   const [flyTarget,      setFlyTarget]     = useState(null);
   const [activeCategory, setActiveCategory]= useState(null);
   const [menuOpen,       setMenuOpen]      = useState(false);
+  // articolo aperto con testo completo (caricato solo all'apertura)
+  const openPost = usePostBody(selectedPost);
 
   // fetch
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("posts").select("*")
-        .eq("published", true)
-        .order("created_at", { ascending: false });
+      const { data } = await fetchPublishedPosts();
       setPosts(data || []);
       setLoading(false);
     })();
@@ -759,7 +759,8 @@ export default function TravelMap({ onBack }) {
         </div>
 
         {/* ── ARTICLE MODAL ── */}
-        {selectedPost && (() => {
+        {openPost && (() => {
+          const selectedPost = openPost; // con il testo completo, se gia' caricato
           const tr    = getT(selectedPost);
           const color = CATEGORY_COLORS[selectedPost.category] || "#c9a84c";
           return (
