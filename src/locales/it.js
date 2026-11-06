@@ -35,6 +35,12 @@ export default {
     loadingText: "Caricamento del testo…",
     errorText: "Non è stato possibile caricare il testo dell'articolo. Riprova più tardi.",
   },
+  days: {
+    toc: "I giorni del viaggio",
+    day: "Giorno {{n}}",
+    photos: "Foto del giorno {{n}}",
+    morePhotos: "Altre foto del viaggio",
+  },
   gallery: { title: "Galleria fotografica · {{count}} foto" },
   empty: "Nessun articolo trovato.",
   loading: "Caricamento articoli…",
@@ -101,6 +107,8 @@ export default {
     readStory: "Leggi il racconto →",
     loading: "Caricamento mappa…",
     error: "Impossibile caricare i viaggi: {{msg}}",
+    route: "Percorso: {{count}} tappe",
+    stop: "Giorno {{n}}",
     showOnMap: "Mostra sulla mappa: {{title}}",
   },
   meta: {

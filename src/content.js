@@ -21,3 +21,6 @@ export function formatMonth(d, lang) {
   return new Date(Date.UTC(+m[1], +m[2] - 1, 1))
     .toLocaleDateString(locale, { month: "long", year: "numeric", timeZone: "UTC" });
 }
+
+// Ancora di un giorno nell'URL dell'articolo: /articoli/<slug>#giorno-3
+export const dayAnchor = (n) => `giorno-${n}`;
