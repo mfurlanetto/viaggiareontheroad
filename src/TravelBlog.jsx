@@ -6,6 +6,8 @@ import { fetchPublishedPosts } from "./postsApi";
 import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
 import { responsiveImage, IMG } from "./images";
+import { paths, postKey, navigateTo, cameFromApp, linkProps } from "./router";
+import { setPageMeta } from "./head";
 
 // ─────────────────────────────────────────────
 // CONSTANTS (module scope — never recreated)
@@ -243,6 +245,9 @@ const STYLES = `
     cursor: pointer; flex-shrink: 0; user-select: none;
   }
   .logo em { color: #e8dfd0; font-style: italic; }
+  a.logo { text-decoration: none; }
+  .card-title a { color: inherit; text-decoration: none; }
+  .error-banner a { color: inherit; text-decoration: underline; }
   .header-right { display: flex; align-items: center; gap: 1.25rem; }
 
   /* nav links — desktop only */
@@ -844,7 +849,7 @@ const STYLES = `
 // ─────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────
-export default function TravelBlog({ onMap }) {
+export default function TravelBlog({ route }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { theme, toggle } = useTheme();
@@ -855,9 +860,7 @@ export default function TravelBlog({ onMap }) {
   const [error,           setError]          = useState(null);
   const [activeContinent, setActiveContinent]= useState("all");
   const [activeCategory,  setActiveCategory] = useState("all");
-  const [selectedPost,    setSelectedPost]   = useState(null);
   const [menuOpen,        setMenuOpen]       = useState(false);
-  const [page,            setPage]           = useState("blog"); // "blog" | "about" | "privacy"
   // La pagina corrente e' legata ai filtri con cui e' stata scelta: se i filtri
   // cambiano, la pagina torna a 1 senza bisogno di un effect.
   const [pageState,       setPageState]      = useState({ key: "all|all", page: 1 });
@@ -866,6 +869,13 @@ export default function TravelBlog({ onMap }) {
   const [galleryData,   setGalleryData]  = useState({ postId: null, images: [] });
   const [galleryIdx,    setGalleryIdx]   = useState(0);
   const [galleryOpen,   setGalleryOpen]  = useState(false);
+  // Pagina e articolo aperto derivano dall'URL (route), non da stato interno:
+  // /articoli/<slug> = blog con l'articolo aperto; indietro/avanti funzionano.
+  const page = route.name === "about" ? "about" : route.name === "privacy" ? "privacy" : "blog";
+  const articleSlug = route.name === "article" ? route.slug : null;
+  const selectedPost = articleSlug ? (posts.find(p => postKey(p) === articleSlug) || null) : null;
+  const articleMissing = !!articleSlug && !loading && !error && !selectedPost;
+  const pageNotFound = route.name === "notfound";
   const postImages = selectedPost && galleryData.postId === selectedPost.id
     ? galleryData.images
     : [];
@@ -908,9 +918,10 @@ export default function TravelBlog({ onMap }) {
 
   // lock body scroll when modal or drawer is open
   useEffect(() => {
-    document.body.style.overflow = (selectedPost || menuOpen || galleryOpen) ? "hidden" : "";
+    // la galleria esiste solo dentro un articolo aperto
+    document.body.style.overflow = (selectedPost || menuOpen) ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [selectedPost, menuOpen, galleryOpen]);
+  }, [selectedPost, menuOpen]);
 
   // ── helpers ──
   const getT = (post) => {
@@ -939,9 +950,8 @@ export default function TravelBlog({ onMap }) {
   // Per il blog si puo' passare una categoria iniziale (es. "Storie" = cultura):
   // i filtri vengono impostati qui, in un solo punto, cosi' non si sovrascrivono.
   const navigate = useCallback((target, { category = "all" } = {}) => {
-    setPage(target);
+    navigateTo(target === "about" ? paths.about : target === "privacy" ? paths.privacy : paths.home);
     setMenuOpen(false);
-    setSelectedPost(null);
     setGalleryOpen(false);
     if (target === "blog") {
       setActiveContinent("all");
@@ -949,6 +959,43 @@ export default function TravelBlog({ onMap }) {
     }
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
+
+  const openArticle = (post) => navigateTo(paths.article(postKey(post)));
+  // Chiudere un articolo aperto dall'interno del sito torna indietro nella
+  // cronologia (conserva lo scroll); se si e' arrivati direttamente dal link,
+  // si sostituisce l'URL con la home.
+  const closeArticle = useCallback(() => {
+    setGalleryOpen(false);
+    if (cameFromApp()) window.history.back();
+    else navigateTo(paths.home, { replace: true });
+  }, []);
+  const goMap = () => { setMenuOpen(false); navigateTo(paths.map); };
+
+  // Esc chiude prima la galleria, poi l'articolo.
+  useEffect(() => {
+    if (!selectedPost) return;
+    const onKey = (e) => {
+      if (e.key !== "Escape") return;
+      if (galleryOpen) setGalleryOpen(false); else closeArticle();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selectedPost, galleryOpen, closeArticle]);
+
+  // Titolo, descrizione e canonical della pagina corrente.
+  useEffect(() => {
+    if (selectedPost) {
+      const l = LANG_KEYS.includes(lang) ? lang : "en";
+      setPageMeta({
+        title: selectedPost[`title_${l}`] || selectedPost.title_it,
+        description: selectedPost[`excerpt_${l}`] || selectedPost.excerpt_it,
+        path: paths.article(postKey(selectedPost)),
+      });
+    } else if (page === "about") setPageMeta({ title: "Chi siamo", path: paths.about });
+    else if (page === "privacy") setPageMeta({ title: "Privacy Policy", path: paths.privacy });
+    else if (pageNotFound || articleMissing) setPageMeta({ title: "Pagina non trovata", path: window.location.pathname });
+    else if (!articleSlug) setPageMeta({ path: paths.home });
+  }, [selectedPost, page, pageNotFound, articleMissing, articleSlug, lang]);
 
   // ── derived ──
   // Dynamic filter keys built from actual DB data (always includes "all")
@@ -1010,17 +1057,17 @@ export default function TravelBlog({ onMap }) {
         <header className="header">
           <div className="header-inner">
 
-            <div className="logo" onClick={() => navigate("blog")}>
+            <a className="logo" {...linkProps(paths.home, () => navigate("blog"))}>
               <em>viaggiare</em>·ontheroad
-            </div>
+            </a>
 
             <div className="header-right">
               {/* Desktop nav — inline, no sub-component */}
               <ul className="nav-list">
-                <li><a onClick={() => navigate("blog")}>{t("nav.destinations")}</a></li>
-                <li><a onClick={() => navigate("blog", { category: "culture" })}>{t("nav.stories")}</a></li>
-                <li><a onClick={() => onMap?.()}>🗺 Mappa</a></li>
-                <li><a onClick={() => navigate("about")}>Chi siamo</a></li>
+                <li><a {...linkProps(paths.home, () => navigate("blog"))}>{t("nav.destinations")}</a></li>
+                <li><a {...linkProps(paths.home, () => navigate("blog", { category: "culture" }))}>{t("nav.stories")}</a></li>
+                <li><a {...linkProps(paths.map, goMap)}>🗺 Mappa</a></li>
+                <li><a {...linkProps(paths.about, () => navigate("about"))}>Chi siamo</a></li>
               </ul>
 
               <button className="theme-btn" onClick={toggle} aria-label="Cambia tema">
@@ -1048,10 +1095,10 @@ export default function TravelBlog({ onMap }) {
         <nav className={`mobile-drawer${menuOpen ? " open" : ""}`} aria-hidden={!menuOpen}>
           {/* Inline nav links — no sub-component, direct navigate() calls */}
           <ul className="nav-list">
-            <li><a onClick={() => navigate("blog")}>{t("nav.destinations")}</a></li>
-            <li><a onClick={() => navigate("blog", { category: "culture" })}>{t("nav.stories")}</a></li>
-            <li><a onClick={() => { setMenuOpen(false); onMap?.(); }}>🗺 Mappa</a></li>
-            <li><a onClick={() => navigate("about")}>Chi siamo</a></li>
+            <li><a {...linkProps(paths.home, () => navigate("blog"))}>{t("nav.destinations")}</a></li>
+            <li><a {...linkProps(paths.home, () => navigate("blog", { category: "culture" }))}>{t("nav.stories")}</a></li>
+            <li><a {...linkProps(paths.map, goMap)}>🗺 Mappa</a></li>
+            <li><a {...linkProps(paths.about, () => navigate("about"))}>Chi siamo</a></li>
           </ul>
 
           <div className="lang-switcher">
@@ -1096,6 +1143,12 @@ export default function TravelBlog({ onMap }) {
             <div className="error-banner">⚠️ {error}</div>
           ) : (
             <>
+              {(articleMissing || pageNotFound) && (
+                <div className="error-banner" role="alert">
+                  {articleMissing ? "Articolo non trovato." : "Pagina non trovata."}{" "}
+                  <a {...linkProps(paths.home, () => navigate("blog"))}>Torna a tutti i viaggi</a>
+                </div>
+              )}
               {/* CAROUSEL */}
               {carouselPosts.length > 0 && (
                 <div className="carousel-wrap">
@@ -1116,7 +1169,7 @@ export default function TravelBlog({ onMap }) {
                           <div
                             key={post.id}
                             className="carousel-slide"
-                            onClick={() => setSelectedPost(post)}
+                            onClick={() => openArticle(post)}
                           >
                             <img {...responsiveImage(post.image_url, ...IMG.hero)} alt={tr.title}
                               width="1200" height="520" decoding="async"
@@ -1192,13 +1245,15 @@ export default function TravelBlog({ onMap }) {
                 {paginated.map(post => {
                   const tr = getT(post);
                   return (
-                    <article key={post.id} className="card" onClick={() => setSelectedPost(post)}>
+                    <article key={post.id} className="card" onClick={() => openArticle(post)}>
                       <div className="card-img-wrap">
                         <img {...responsiveImage(post.image_url, ...IMG.card)} alt={tr.title}
                           width="400" height="215" loading="lazy" decoding="async" />
                       </div>
                       <div className="card-cat">{tr.destination} · {t(`categories.${post.category}`)}</div>
-                      <h2 className="card-title">{tr.title}</h2>
+                      <h2 className="card-title">
+                        <a {...linkProps(paths.article(postKey(post)), () => openArticle(post))}>{tr.title}</a>
+                      </h2>
                       <p className="card-subtitle">{tr.subtitle}</p>
                       <p className="card-excerpt">{tr.excerpt}</p>
                       <div className="card-footer">
@@ -1271,24 +1326,24 @@ export default function TravelBlog({ onMap }) {
             <div className="footer-col">
               <h4>Esplora</h4>
               <ul>
-                <li><a onClick={() => navigate("blog")}>Tutti i viaggi</a></li>
-                <li><a onClick={() => onMap?.()}>Mappa interattiva</a></li>
-                <li><a onClick={() => navigate("blog", { category: "culture" })}>Cultura</a></li>
-                <li><a onClick={() => navigate("blog", { category: "nature" })}>Natura</a></li>
+                <li><a {...linkProps(paths.home, () => navigate("blog"))}>Tutti i viaggi</a></li>
+                <li><a {...linkProps(paths.map, goMap)}>Mappa interattiva</a></li>
+                <li><a {...linkProps(paths.home, () => navigate("blog", { category: "culture" }))}>Cultura</a></li>
+                <li><a {...linkProps(paths.home, () => navigate("blog", { category: "nature" }))}>Natura</a></li>
               </ul>
             </div>
             <div className="footer-col">
               <h4>Il progetto</h4>
               <ul>
-                <li><a onClick={() => navigate("about")}>Chi siamo</a></li>
+                <li><a {...linkProps(paths.about, () => navigate("about"))}>Chi siamo</a></li>
                 <li><a href={`mailto:${CONTACT_EMAIL}`}>Contatti</a></li>
-                <li><a onClick={() => navigate("privacy")}>Privacy Policy</a></li>
+                <li><a {...linkProps(paths.privacy, () => navigate("privacy"))}>Privacy Policy</a></li>
               </ul>
             </div>
           </div>
           <div className="footer-bottom">
             <span className="brand">© {new Date().getFullYear()} viaggiare·ontheroad · Alcune foto: <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></span>
-            <a onClick={() => navigate("privacy")}>Privacy Policy</a>
+            <a {...linkProps(paths.privacy, () => navigate("privacy"))}>Privacy Policy</a>
           </div>
         </footer>
 
@@ -1297,13 +1352,13 @@ export default function TravelBlog({ onMap }) {
           const selectedPost = openPost; // con il testo completo, se gia' caricato
           const tr = getT(selectedPost);
           return (
-            <div className="modal-overlay" onClick={() => setSelectedPost(null)}>
-              <div className="modal" onClick={e => e.stopPropagation()}>
+            <div className="modal-overlay" onClick={closeArticle}>
+              <div className="modal" role="dialog" aria-modal="true" aria-labelledby="article-title" onClick={e => e.stopPropagation()}>
                 <img className="modal-hero-img" {...responsiveImage(selectedPost.image_url, ...IMG.modal)} alt={tr.title}
                   width="720" height="300" decoding="async" />
                 <div className="modal-body">
                   <div className="modal-cat">{tr.destination} · {t(`categories.${selectedPost.category}`)}</div>
-                  <h2 className="modal-title">{tr.title}</h2>
+                  <h1 className="modal-title" id="article-title">{tr.title}</h1>
                   <p className="modal-subtitle">{tr.subtitle}</p>
                   <div className="modal-meta">
                     <span>📅 {formatDate(selectedPost.date)}</span>
@@ -1333,7 +1388,7 @@ export default function TravelBlog({ onMap }) {
                     </div>
                   )}
 
-                  <button className="modal-close" onClick={() => setSelectedPost(null)}>
+                  <button className="modal-close" onClick={closeArticle}>
                     {t("modal.back")}
                   </button>
                 </div>

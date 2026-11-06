@@ -7,7 +7,7 @@ const perLang = (name) => LANGS.map(l => `${name}_${l}`);
 // (body_*) e' il campo piu' pesante e serve solo quando un articolo viene aperto.
 const LIST_COLUMNS = [
   "id", "created_at", "published", "featured", "continent", "category",
-  "date", "read_time", "image_url", "tags", "lat", "lng",
+  "date", "read_time", "image_url", "tags", "lat", "lng", "slug",
   ...["title", "subtitle", "destination", "excerpt"].flatMap(perLang),
 ].join(",");
 

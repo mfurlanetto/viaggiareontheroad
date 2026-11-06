@@ -8,9 +8,10 @@ import markerIcon   from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import "./i18n";
 import { fetchPublishedPosts } from "./postsApi";
-import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
 import { responsiveImage, IMG } from "./images";
+import { paths, postKey, navigateTo, linkProps } from "./router";
+import { setPageMeta } from "./head";
 
 // ─────────────────────────────────────────────
 // CONSTANTS — module scope, never recreated
@@ -122,6 +123,7 @@ const STYLES = `
     cursor: pointer; flex-shrink: 0; user-select: none;
   }
   .logo em { color: #e8dfd0; font-style: italic; }
+  a.logo { text-decoration: none; }
   .header-right { display: flex; align-items: center; gap: 1.25rem; }
 
   .nav-list {
@@ -303,9 +305,11 @@ const STYLES = `
     border: none; font-family: 'Lato', sans-serif;
     font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
     text-transform: uppercase; cursor: pointer; border-radius: 2px;
-    text-align: center; transition: opacity 0.2s;
+    text-align: center; transition: opacity 0.2s; text-decoration: none;
   }
   .map-popup-btn:hover { opacity: 0.85; }
+  /* Leaflet colora i link del contenitore: qui serve il colore del pulsante */
+  .leaflet-container a.map-popup-btn { color: #0f0f0d; }
 
   /* ── SIDE PANEL ── */
   .side-panel {
@@ -339,49 +343,6 @@ const STYLES = `
   }
   .side-card-dest { font-size: 0.75rem; color: var(--text3); font-style: italic; margin-top: 0.1rem; }
   .side-card-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
-
-  /* ── MODAL ── */
-  .modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.88);
-    z-index: 300; display: flex; align-items: center; justify-content: center;
-    padding: 1rem; animation: fadeIn 0.3s ease;
-  }
-  @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
-  .modal {
-    background: var(--modal-bg); max-width: 720px; width: 100%;
-    max-height: 92vh; overflow-y: auto; border-radius: 6px;
-    animation: slideUp 0.35s ease;
-  }
-  @keyframes slideUp { from { transform: translateY(30px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
-  .modal-hero-img { width: 100%; height: 300px; object-fit: cover; }
-  .modal-body { padding: 2rem 2.25rem 2.75rem; }
-  .modal-cat {
-    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.14em;
-    text-transform: uppercase; margin-bottom: 0.5rem;
-  }
-  .modal-title {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(1.75rem, 1.4rem + 1.2vw, 2.25rem);
-    line-height: 1.18; margin-bottom: 0.4rem; color: var(--text);
-  }
-  .modal-subtitle { font-size: 1.05rem; color: var(--text3); font-style: italic; margin-bottom: 1.25rem; line-height: 1.5; }
-  .modal-meta {
-    display: flex; gap: 1.5rem; font-size: 0.85rem; color: var(--text3);
-    margin-bottom: 1.5rem; padding-bottom: 1.5rem;
-    border-bottom: 1px solid var(--border); flex-wrap: wrap;
-  }
-  .modal-text { font-size: 1rem; line-height: 1.9; color: var(--text2); white-space: pre-line; }
-  .modal-status { color: var(--text3); font-style: italic; }
-  .error-banner { max-width: 1400px; margin: 0 auto 1.25rem; padding: 1rem 2rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404; }
-  .modal-close {
-    display: block; margin: 2rem auto 0;
-    padding: 0.8rem 2.5rem; background: var(--text); color: var(--gold-light);
-    border: none; font-family: 'Lato', sans-serif;
-    font-size: 0.85rem; font-weight: 700;
-    letter-spacing: 0.12em; text-transform: uppercase;
-    cursor: pointer; border-radius: 3px; transition: opacity 0.2s;
-  }
-  .modal-close:hover { opacity: 0.8; }
 
   /* ── LOADING ── */
   .loading {
@@ -426,10 +387,6 @@ const STYLES = `
     .map-layout { padding: 0 1rem 3rem; }
     .map-main { height: 340px; }
 
-    .modal-overlay { padding: 0; align-items: flex-end; }
-    .modal { max-height: 95vh; border-radius: 10px 10px 0 0; }
-    .modal-hero-img { height: 220px; }
-    .modal-body { padding: 1.25rem 1.25rem 2rem; }
   }
 `;
 
@@ -456,20 +413,17 @@ function MapFlyTo({ coords }) {
 // ─────────────────────────────────────────────
 // MAIN COMPONENT
 // ─────────────────────────────────────────────
-export default function TravelMap({ onBack }) {
+export default function TravelMap() {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const { theme, toggle } = useTheme();
 
   const [posts,          setPosts]         = useState([]);
   const [loading,        setLoading]       = useState(true);
-  const [selectedPost,   setSelectedPost]  = useState(null);
   const [flyTarget,      setFlyTarget]     = useState(null);
   const [activeCategory, setActiveCategory]= useState(null);
   const [menuOpen,       setMenuOpen]      = useState(false);
   const [error,          setError]         = useState(null);
-  // articolo aperto con testo completo (caricato solo all'apertura)
-  const [openPost, bodyStatus] = usePostBody(selectedPost);
 
   // fetch
   useEffect(() => {
@@ -481,17 +435,22 @@ export default function TravelMap({ onBack }) {
     })();
   }, []);
 
-  // lock body scroll when modal or drawer open
+  // lock body scroll when drawer open
   useEffect(() => {
-    document.body.style.overflow = (selectedPost || menuOpen) ? "hidden" : "";
+    document.body.style.overflow = menuOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
-  }, [selectedPost, menuOpen]);
+  }, [menuOpen]);
 
-  // close drawer on back navigation
+  useEffect(() => {
+    setPageMeta({ title: "Mappa dei viaggi", description: "Tutti i viaggi del blog su una mappa: clicca un segnaposto per leggere il racconto.", path: paths.map });
+  }, []);
+
   const goBack = useCallback(() => {
     setMenuOpen(false);
-    onBack?.();
-  }, [onBack]);
+    navigateTo(paths.home);
+  }, []);
+  // L'articolo si apre alla sua pagina (/articoli/<slug>); "indietro" torna qui.
+  const openArticle = (post) => navigateTo(paths.article(postKey(post)));
 
   // helpers
   const getT = (post) => {
@@ -557,14 +516,14 @@ export default function TravelMap({ onBack }) {
         <header className="header">
           <div className="header-inner">
 
-            <div className="logo" onClick={goBack}>
+            <a className="logo" {...linkProps(paths.home, goBack)}>
               <em>viaggiare</em>·ontheroad
-            </div>
+            </a>
 
             <div className="header-right">
               {/* Desktop nav — inlined, no sub-component */}
               <ul className="nav-list">
-                <li><a onClick={goBack}>{t("nav.destinations")}</a></li>
+                <li><a {...linkProps(paths.home, goBack)}>{t("nav.destinations")}</a></li>
                 <li><a className="active">🗺 {t("nav.map") || "Mappa"}</a></li>
               </ul>
 
@@ -597,7 +556,7 @@ export default function TravelMap({ onBack }) {
         <nav className={`mobile-drawer${menuOpen ? " open" : ""}`} aria-hidden={!menuOpen}>
           {/* Inlined nav links — direct goBack() call, no sub-component */}
           <ul className="nav-list">
-            <li><a onClick={goBack}>{t("nav.destinations")}</a></li>
+            <li><a {...linkProps(paths.home, goBack)}>{t("nav.destinations")}</a></li>
             <li><a className="active">🗺 {t("nav.map") || "Mappa"}</a></li>
           </ul>
 
@@ -703,10 +662,9 @@ export default function TravelMap({ onBack }) {
                         <div className="map-popup-title">{tr.title}</div>
                         <div className="map-popup-dest">{tr.subtitle}</div>
                         <p className="map-popup-excerpt">{tr.excerpt}</p>
-                        <button
-                          className="map-popup-btn"
-                          onClick={() => setSelectedPost(post)}
-                        >Leggi il racconto →</button>
+                        <a className="map-popup-btn" {...linkProps(paths.article(postKey(post)), () => openArticle(post))}>
+                          Leggi il racconto →
+                        </a>
                       </div>
                     </Popup>
                   </Marker>
@@ -749,39 +707,6 @@ export default function TravelMap({ onBack }) {
           </div>
         </div>
 
-        {/* ── ARTICLE MODAL ── */}
-        {openPost && (() => {
-          const selectedPost = openPost; // con il testo completo, se gia' caricato
-          const tr    = getT(selectedPost);
-          const color = CATEGORY_COLORS[selectedPost.category] || "#c9a84c";
-          return (
-            <div className="modal-overlay" onClick={() => setSelectedPost(null)}>
-              <div className="modal" onClick={e => e.stopPropagation()}>
-                {selectedPost.image_url && (
-                  <img className="modal-hero-img" {...responsiveImage(selectedPost.image_url, ...IMG.modal)} alt={tr.title} width="720" height="300" decoding="async" />
-                )}
-                <div className="modal-body">
-                  <div className="modal-cat" style={{ color }}>
-                    {tr.destination} · {categoryLabels[selectedPost.category]}
-                  </div>
-                  <h2 className="modal-title">{tr.title}</h2>
-                  <p className="modal-subtitle">{tr.subtitle}</p>
-                  <div className="modal-meta">
-                    <span>📅 {formatDate(selectedPost.date)}</span>
-                    <span>🌍 {t(`continents.${selectedPost.continent}`)}</span>
-                    <span>⏱ {selectedPost.read_time} {t("modal.read")}</span>
-                  </div>
-                  {bodyStatus === "loading" && <p className="modal-text modal-status">Caricamento del testo…</p>}
-                  {bodyStatus === "error" && <p className="modal-text modal-status">Non è stato possibile caricare il testo dell'articolo. Riprova più tardi.</p>}
-                  {bodyStatus === "ready" && <p className="modal-text">{tr.body}</p>}
-                  <button className="modal-close" onClick={() => setSelectedPost(null)}>
-                    {t("modal.back")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          );
-        })()}
 
       </div>
     </>
