@@ -1,0 +1,237 @@
+/* Stili comuni a tutte le pagine: colori, header, menu mobile, caricamento. */
+
+:root, [data-theme="light"] {
+  --bg:            #faf8f5;
+  --bg2:           #f0ece4;
+  --surface:       #ffffff;
+  --border:        #e0d8c8;
+  --text:          #1a1a18;
+  --text2:         #4a4a48;
+  --text3:         #6b6b69;
+  --header-bg:     #1a1a18;
+  --header-border: #2e2e2c;
+  --gold:          #7d6416;
+  --gold-btn:      #d4a843;
+  --gold-light:    #f0d078;
+  --tag-bg:        #f0ece4;
+  --tag-text:      #6a6a68;
+  --modal-bg:      #faf8f5;
+  --spinner-track: #e8e0d0;
+  --filter-border: #cdc5b5;
+  --divider:       #ddd8d0;
+  --card-hover-bg: #f4f0e8;
+  --footer-bg:     #1a1a18;
+  --footer-text:   #9a9a98;
+  --gold-em:       #7d6416;
+  --side-bg:       #ffffff;
+  --popup-bg:      #1a1a18;
+  --tile-filter:   saturate(0.8) brightness(1);
+}
+[data-theme="dark"] {
+  --bg:            #0f0f0d;
+  --bg2:           #171715;
+  --surface:       #1c1c1a;
+  --border:        #2c2c2a;
+  --text:          #e8dfd0;
+  --text2:         #b0a898;
+  --text3:         #8f8f86;
+  --header-bg:     #0a0a08;
+  --header-border: #222220;
+  --gold:          #c9a84c;
+  --gold-btn:      #d4b05a;
+  --gold-light:    #e8c87a;
+  --tag-bg:        #222220;
+  --tag-text:      #a09a8c;
+  --modal-bg:      #131311;
+  --spinner-track: #252523;
+  --filter-border: #353533;
+  --divider:       #2a2a28;
+  --card-hover-bg: #1e1e1c;
+  --footer-bg:     #0a0a08;
+  --footer-text:   #9a9a98;
+  --gold-em:       #d4b05a;
+  --side-bg:       #1c1c1a;
+  --popup-bg:      #1a1a18;
+  --tile-filter:   saturate(0.15) brightness(0.55) sepia(0.3);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body { background: var(--bg); }
+
+.page-root {
+  font-family: 'Lato', -apple-system, sans-serif;
+  font-size: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
+  line-height: 1.65;
+  background: var(--bg);
+  min-height: 100vh;
+  color: var(--text);
+  transition: background 0.3s, color 0.3s;
+}
+
+/* ── HEADER ── */
+.header {
+  background: var(--header-bg);
+  padding: 0 2rem;
+  position: sticky; top: 0; z-index: 200;
+  border-bottom: 1px solid var(--header-border);
+}
+.header-inner {
+  max-width: 1200px; margin: 0 auto;
+  display: flex; align-items: center; justify-content: space-between;
+  height: 64px; gap: 1rem;
+}
+.logo {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.45rem; color: var(--gold-light);
+  cursor: pointer; flex-shrink: 0; user-select: none;
+}
+.logo em { color: #e8dfd0; font-style: italic; }
+a.logo { text-decoration: none; }
+.card-title a { color: inherit; text-decoration: none; }
+.error-banner a { color: inherit; text-decoration: underline; }
+.header-right { display: flex; align-items: center; gap: 1.25rem; }
+
+/* nav links — desktop only */
+.nav-list {
+  display: flex; gap: 1.5rem; list-style: none;
+  font-size: 0.75rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+}
+.nav-list li a {
+  color: #888; text-decoration: none;
+  cursor: pointer; white-space: nowrap;
+  transition: color 0.2s; padding: 0.25rem 0;
+  /* large tap target without changing layout */
+  display: inline-block;
+}
+.nav-list li a:hover { color: var(--gold-light); }
+
+.theme-btn {
+  background: transparent; border: 1px solid var(--header-border);
+  color: #888; width: 34px; height: 34px; border-radius: 50%;
+  cursor: pointer; font-size: 1rem;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.2s; flex-shrink: 0;
+}
+.theme-btn:hover { border-color: var(--gold-light); color: var(--gold-light); }
+
+.lang-switcher {
+  display: flex; gap: 0.25rem;
+  border-left: 1px solid var(--header-border); padding-left: 1rem;
+}
+.lang-btn {
+  background: transparent; border: 1px solid transparent;
+  color: #9a9a98; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
+  padding: 0.2rem 0.45rem; border-radius: 2px; cursor: pointer; transition: all 0.2s;
+}
+.lang-btn:hover { color: var(--gold-light); border-color: #444; }
+.lang-btn.active { background: var(--gold-btn); color: #1a1a18; border-color: var(--gold-btn); }
+
+.menu-btn {
+  display: none; background: transparent; border: none;
+  color: #888; font-size: 1.5rem; cursor: pointer;
+  padding: 0.25rem; line-height: 1; min-width: 36px; min-height: 36px;
+  align-items: center; justify-content: center;
+}
+
+/* ── MOBILE DRAWER ── */
+/* Always in the DOM; shown/hidden via opacity + pointer-events.
+   This avoids any React unmount/remount that could steal focus. */
+.mobile-drawer {
+  position: fixed; top: 64px; left: 0; right: 0; bottom: 0;
+  background: var(--header-bg);
+  z-index: 199;                    /* below header (200) */
+  display: flex; flex-direction: column;
+  padding: 2rem; gap: 1.75rem;
+  border-top: 1px solid var(--header-border);
+  overflow-y: auto;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-6px);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+.mobile-drawer.open {
+  opacity: 1; pointer-events: auto; transform: translateY(0);
+}
+/* drawer nav — same list but bigger and vertical */
+.mobile-drawer .nav-list {
+  flex-direction: column; gap: 0; display: flex !important;
+}
+.mobile-drawer .nav-list li a {
+  font-size: 1.1rem; color: #bbb;
+  padding: 0.75rem 0;
+  display: block;
+  border-bottom: 1px solid var(--header-border);
+}
+.mobile-drawer .nav-list li:last-child a { border-bottom: none; }
+.mobile-drawer .nav-list li a:hover { color: var(--gold-light); }
+.mobile-drawer .lang-switcher {
+  border-left: none; padding-left: 0;
+  border-top: 1px solid var(--header-border);
+  padding-top: 1.25rem; flex-wrap: wrap; gap: 0.4rem;
+}
+.mobile-drawer .theme-row {
+  display: flex; align-items: center; gap: 0.75rem;
+  color: #9a9a98; font-size: 0.9rem; cursor: pointer;
+  padding: 0.5rem 0;
+}
+
+/* ── LOADING ── */
+.loading {
+  display: flex; align-items: center; justify-content: center;
+  min-height: 60vh; flex-direction: column; gap: 1rem;
+}
+.spinner {
+  width: 40px; height: 40px;
+  border: 3px solid var(--spinner-track); border-top-color: var(--gold);
+  border-radius: 50%; animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.loading-text { font-family: 'Playfair Display', serif; font-size: 1.1rem; color: var(--text3); font-style: italic; }
+.error-banner { max-width: 1200px; margin: 2rem auto; padding: 1rem 2rem; background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; color: #856404; }
+
+a.logo { text-decoration: none; }
+.error-banner a { color: inherit; text-decoration: underline; }
+.page-main:focus { outline: none; }
+
+/* ── ACCESSIBILITA' ── */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+}
+.skip-link {
+  position: absolute; left: 1rem; top: -100px; z-index: 1000;
+  background: var(--gold-btn); color: #1a1a18; padding: 0.6rem 1rem;
+  font-weight: 700; border-radius: 3px; text-decoration: none;
+}
+.skip-link:focus { top: 0.75rem; }
+/* Contorno visibile per chi naviga da tastiera */
+:where(a, button, [tabindex]):focus-visible {
+  outline: 2px solid var(--gold-btn); outline-offset: 2px;
+}
+button.theme-row { background: none; border: none; font: inherit; width: 100%; text-align: left; }
+.theme-row .theme-btn { display: flex !important; }
+
+@media (max-width: 900px) {
+  .header { padding: 0 1.25rem; }
+  .header .nav-list { display: none; }
+  .header .lang-switcher { display: none; }
+  .header .theme-btn { display: none; }
+  .menu-btn { display: flex; }
+}
+
+/* Chi preferisce meno movimento: niente animazioni ne' scroll animato */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important; animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+.header-inner.wide { max-width: 1400px; }
+.nav-list li a[aria-current="page"] { color: var(--gold-light); }
+.lang-btn { text-decoration: none; display: inline-block; }
+
+/* Link dentro un testo: sottolineati, non distinguibili solo dal colore (WCAG 1.4.1) */
+.footer-bottom .brand a, figcaption a { text-decoration: underline; }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -6,31 +6,21 @@ import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon   from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
-import "./i18n";
+import "./styles/map.css";
 import { fetchPublishedPosts } from "./postsApi";
 import { useTheme } from "./useTheme";
 import { responsiveImage, IMG } from "./images";
-import { paths, postKey, navigateTo, linkProps } from "./router";
+import { pathFor, postKey, navigateTo, linkProps } from "./router";
 import { setPageMeta } from "./head";
+import { postText, formatMonth } from "./content";
+import SiteHeader from "./components/SiteHeader";
 
-// ─────────────────────────────────────────────
-// CONSTANTS — module scope, never recreated
-// ─────────────────────────────────────────────
 const CATEGORY_COLORS = {
   culture: "#c9a84c", adventure: "#e07b4a",
   nature: "#5a9e6f", food: "#c0564b", sea: "#4a7eb5",
 };
 
-const LANGUAGES = [
-  { code: "it", label: "IT", flag: "🇮🇹" },
-  { code: "en", label: "EN", flag: "🇬🇧" },
-  { code: "fr", label: "FR", flag: "🇫🇷" },
-  { code: "es", label: "ES", flag: "🇪🇸" },
-  { code: "de", label: "DE", flag: "🇩🇪" },
-];
-const LANG_KEYS = ["it", "en", "fr", "es", "de"];
-
-// Fix Leaflet default icon (icone servite dal nostro stesso dominio, non da una CDN)
+// Icone di Leaflet servite dal nostro dominio, non da una CDN
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
@@ -38,384 +28,34 @@ L.Icon.Default.mergeOptions({
   shadowUrl:     markerShadow,
 });
 
-// ─────────────────────────────────────────────
-// CSS — identical token names + same font as TravelBlog
-// ─────────────────────────────────────────────
-const STYLES = `
-  /* Same tokens as TravelBlog so the two pages look identical */
-  :root, [data-theme="light"] {
-    --bg:            #faf8f5;
-    --bg2:           #f0ece4;
-    --surface:       #ffffff;
-    --border:        #e0d8c8;
-    --text:          #1a1a18;
-    --text2:         #4a4a48;
-    --text3:         #7a7a78;
-    --header-bg:     #1a1a18;
-    --header-border: #2e2e2c;
-    --gold:          #b8962e;
-    --gold-btn:      #d4a843;
-    --gold-light:    #f0d078;
-    --tag-bg:        #f0ece4;
-    --tag-text:      #6a6a68;
-    --modal-bg:      #faf8f5;
-    --spinner-track: #e8e0d0;
-    --divider:       #ddd8d0;
-    --footer-bg:     #1a1a18;
-    --side-bg:       #ffffff;
-    --popup-bg:      #1a1a18;
-    --tile-filter:   saturate(0.8) brightness(1);
-  }
-  [data-theme="dark"] {
-    --bg:            #0f0f0d;
-    --bg2:           #171715;
-    --surface:       #1c1c1a;
-    --border:        #2c2c2a;
-    --text:          #e8dfd0;
-    --text2:         #b0a898;
-    --text3:         #686860;
-    --header-bg:     #0a0a08;
-    --header-border: #222220;
-    --gold:          #c9a84c;
-    --gold-btn:      #d4b05a;
-    --gold-light:    #e8c87a;
-    --tag-bg:        #222220;
-    --tag-text:      #888880;
-    --modal-bg:      #131311;
-    --spinner-track: #252523;
-    --divider:       #2a2a28;
-    --footer-bg:     #0a0a08;
-    --side-bg:       #1c1c1a;
-    --popup-bg:      #1a1a18;
-    --tile-filter:   saturate(0.15) brightness(0.55) sepia(0.3);
-  }
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-  html { scroll-behavior: smooth; }
-  body { background: var(--bg); }
-
-  /* Same font stack as TravelBlog */
-  .map-root {
-    font-family: 'Lato', -apple-system, sans-serif;
-    font-size: clamp(1rem, 0.95rem + 0.25vw, 1.125rem);
-    line-height: 1.65;
-    background: var(--bg);
-    min-height: 100vh;
-    color: var(--text);
-    transition: background 0.3s, color 0.3s;
-  }
-
-  /* ── HEADER — identical to TravelBlog ── */
-  .header {
-    background: var(--header-bg);
-    padding: 0 2rem;
-    position: sticky; top: 0; z-index: 200;
-    border-bottom: 1px solid var(--header-border);
-  }
-  .header-inner {
-    max-width: 1400px; margin: 0 auto;
-    display: flex; align-items: center; justify-content: space-between;
-    height: 64px; gap: 1rem;
-  }
-  .logo {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.45rem; color: var(--gold-light);
-    cursor: pointer; flex-shrink: 0; user-select: none;
-  }
-  .logo em { color: #e8dfd0; font-style: italic; }
-  a.logo { text-decoration: none; }
-  .header-right { display: flex; align-items: center; gap: 1.25rem; }
-
-  .nav-list {
-    display: flex; gap: 1.5rem; list-style: none;
-    font-size: 0.75rem; font-weight: 700;
-    letter-spacing: 0.1em; text-transform: uppercase;
-  }
-  .nav-list li a {
-    color: #888; text-decoration: none;
-    cursor: pointer; white-space: nowrap;
-    transition: color 0.2s; display: inline-block; padding: 0.25rem 0;
-  }
-  .nav-list li a:hover  { color: var(--gold-light); }
-  .nav-list li a.active { color: var(--gold-light); }
-
-  .theme-btn {
-    background: transparent; border: 1px solid var(--header-border);
-    color: #888; width: 34px; height: 34px; border-radius: 50%;
-    cursor: pointer; font-size: 1rem;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.2s; flex-shrink: 0;
-  }
-  .theme-btn:hover { border-color: var(--gold-light); color: var(--gold-light); }
-
-  .lang-switcher {
-    display: flex; gap: 0.25rem;
-    border-left: 1px solid var(--header-border); padding-left: 1rem;
-  }
-  .lang-btn {
-    background: transparent; border: 1px solid transparent;
-    color: #666; font-size: 0.7rem; font-weight: 700; letter-spacing: 0.06em;
-    padding: 0.2rem 0.45rem; border-radius: 2px; cursor: pointer; transition: all 0.2s;
-  }
-  .lang-btn:hover  { color: var(--gold-light); border-color: #444; }
-  .lang-btn.active { background: var(--gold-btn); color: #1a1a18; border-color: var(--gold-btn); }
-
-  .menu-btn {
-    display: none; background: transparent; border: none;
-    color: #888; font-size: 1.5rem; cursor: pointer;
-    padding: 0.25rem; line-height: 1; min-width: 36px; min-height: 36px;
-    align-items: center; justify-content: center;
-  }
-
-  /* ── MOBILE DRAWER — same opacity/pointer-events pattern as TravelBlog ── */
-  .mobile-drawer {
-    position: fixed; top: 64px; left: 0; right: 0; bottom: 0;
-    background: var(--header-bg);
-    z-index: 199;
-    display: flex; flex-direction: column;
-    padding: 2rem; gap: 1.75rem;
-    border-top: 1px solid var(--header-border);
-    overflow-y: auto;
-    opacity: 0;
-    pointer-events: none;
-    transform: translateY(-6px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-  }
-  .mobile-drawer.open { opacity: 1; pointer-events: auto; transform: translateY(0); }
-  .mobile-drawer .nav-list {
-    flex-direction: column; gap: 0; display: flex !important;
-  }
-  .mobile-drawer .nav-list li a {
-    font-size: 1.1rem; color: #bbb;
-    padding: 0.75rem 0; display: block;
-    border-bottom: 1px solid var(--header-border);
-  }
-  .mobile-drawer .nav-list li:last-child a { border-bottom: none; }
-  .mobile-drawer .nav-list li a:hover,
-  .mobile-drawer .nav-list li a.active { color: var(--gold-light); }
-  .mobile-drawer .lang-switcher {
-    border-left: none; padding-left: 0;
-    border-top: 1px solid var(--header-border);
-    padding-top: 1.25rem; flex-wrap: wrap; gap: 0.4rem;
-  }
-  .mobile-drawer .theme-row {
-    display: flex; align-items: center; gap: 0.75rem;
-    color: #666; font-size: 0.9rem; cursor: pointer; padding: 0.5rem 0;
-  }
-
-  /* ── PAGE HERO ── */
-  .page-hero {
-    max-width: 1400px; margin: 0 auto;
-    padding: 2.5rem 2rem 1.5rem;
-    display: flex; align-items: flex-end;
-    justify-content: space-between; gap: 2rem; flex-wrap: wrap;
-  }
-  .page-eyebrow {
-    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.2em;
-    text-transform: uppercase; color: var(--gold); margin-bottom: 0.5rem;
-  }
-  .page-title {
-    font-family: 'Playfair Display', serif;
-    font-size: clamp(2rem, 1.5rem + 2vw, 2.75rem);
-    line-height: 1.1; color: var(--text);
-  }
-  .page-title em { color: var(--gold-btn); font-style: italic; }
-  .page-subtitle {
-    font-size: 1rem; color: var(--text3);
-    margin-top: 0.6rem; max-width: 440px; line-height: 1.6;
-  }
-  .counter-row { display: flex; gap: 2rem; flex-shrink: 0; }
-  .counter { text-align: right; }
-  .counter-num {
-    font-family: 'Playfair Display', serif;
-    font-size: 2.25rem; color: var(--gold-btn); line-height: 1;
-  }
-  .counter-label {
-    font-size: 0.72rem; font-weight: 700; letter-spacing: 0.12em;
-    text-transform: uppercase; color: var(--text3); margin-top: 0.2rem;
-  }
-
-  /* ── LEGEND ── */
-  .legend {
-    max-width: 1400px; margin: 0 auto;
-    padding: 0 2rem 1.25rem;
-    display: flex; gap: 1.25rem; flex-wrap: wrap; align-items: center;
-  }
-  .legend-label {
-    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; color: var(--text3); margin-right: 0.4rem;
-  }
-  .legend-item {
-    display: flex; align-items: center; gap: 0.4rem;
-    cursor: pointer; transition: opacity 0.2s;
-  }
-  .legend-item.dimmed { opacity: 0.3; }
-  .legend-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
-  .legend-text { font-size: 0.85rem; color: var(--text3); }
-  .legend-item:hover .legend-text { color: var(--text); }
-  .legend-clear {
-    font-size: 0.82rem; color: var(--gold-btn);
-    cursor: pointer; margin-left: 0.5rem;
-  }
-
-  /* ── MAP LAYOUT ── */
-  .map-layout {
-    display: grid; grid-template-columns: 1fr 320px;
-    gap: 1.25rem; max-width: 1400px; margin: 0 auto;
-    padding: 0 2rem 4rem;
-  }
-  .map-main {
-    border-radius: 6px; overflow: hidden;
-    border: 1px solid var(--border); height: 560px;
-  }
-  .map-main .leaflet-container { height: 100%; background: var(--bg) !important; }
-  .leaflet-tile { filter: var(--tile-filter) !important; transition: filter 0.3s; }
-
-  /* ── LEAFLET POPUP ── */
-  .leaflet-popup-content-wrapper {
-    background: var(--popup-bg) !important;
-    border: 1px solid #2a2a28 !important; border-radius: 4px !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.5) !important; padding: 0 !important;
-  }
-  .leaflet-popup-content { margin: 0 !important; min-width: 210px !important; }
-  .leaflet-popup-tip { background: var(--popup-bg) !important; }
-  .leaflet-popup-close-button { color: #555 !important; top: 8px !important; right: 10px !important; font-size: 16px !important; }
-  .leaflet-popup-close-button:hover { color: var(--gold-btn) !important; }
-  .map-popup { padding: 0.9rem 1.1rem; }
-  .map-popup-cat {
-    font-size: 0.65rem; font-weight: 700; letter-spacing: 0.12em;
-    text-transform: uppercase; margin-bottom: 0.35rem;
-  }
-  .map-popup-img {
-    width: 100%; height: 100px; object-fit: cover;
-    border-radius: 2px; margin-bottom: 0.65rem; display: block;
-  }
-  .map-popup-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 1rem; color: #f0ece4; line-height: 1.3; margin-bottom: 0.15rem;
-  }
-  .map-popup-dest { font-size: 0.8rem; color: #777; font-style: italic; margin-bottom: 0.6rem; }
-  .map-popup-excerpt {
-    font-size: 0.82rem; color: #aaa; line-height: 1.5; margin-bottom: 0.65rem;
-    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-  }
-  .map-popup-btn {
-    display: block; width: 100%; padding: 0.45rem;
-    background: var(--gold-btn); color: #0f0f0d;
-    border: none; font-family: 'Lato', sans-serif;
-    font-size: 0.75rem; font-weight: 700; letter-spacing: 0.1em;
-    text-transform: uppercase; cursor: pointer; border-radius: 2px;
-    text-align: center; transition: opacity 0.2s; text-decoration: none;
-  }
-  .map-popup-btn:hover { opacity: 0.85; }
-  /* Leaflet colora i link del contenitore: qui serve il colore del pulsante */
-  .leaflet-container a.map-popup-btn { color: #0f0f0d; }
-
-  /* ── SIDE PANEL ── */
-  .side-panel {
-    background: var(--side-bg); border-radius: 6px;
-    border: 1px solid var(--border); padding: 1.25rem;
-    overflow-y: auto; height: 560px;
-  }
-  .side-panel-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 0.95rem; color: var(--text);
-    margin-bottom: 0.85rem; padding-bottom: 0.65rem;
-    border-bottom: 1px solid var(--divider);
-  }
-  .side-card {
-    display: flex; gap: 0.65rem;
-    padding: 0.75rem 0; border-bottom: 1px solid var(--divider);
-    cursor: pointer; transition: padding-left 0.2s;
-  }
-  .side-card:hover { padding-left: 0.4rem; }
-  .side-card:last-child { border-bottom: none; }
-  .side-card-img { width: 62px; height: 46px; object-fit: cover; border-radius: 3px; flex-shrink: 0; }
-  .side-card-body { flex: 1; min-width: 0; }
-  .side-card-cat {
-    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em;
-    text-transform: uppercase; margin-bottom: 0.15rem;
-  }
-  .side-card-title {
-    font-family: 'Playfair Display', serif;
-    font-size: 0.85rem; color: var(--text); line-height: 1.3;
-    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .side-card-dest { font-size: 0.75rem; color: var(--text3); font-style: italic; margin-top: 0.1rem; }
-  .side-card-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
-
-  /* ── LOADING ── */
-  .loading {
-    display: flex; align-items: center; justify-content: center;
-    min-height: 60vh; flex-direction: column; gap: 1rem;
-  }
-  .spinner {
-    width: 40px; height: 40px;
-    border: 3px solid var(--spinner-track); border-top-color: var(--gold);
-    border-radius: 50%; animation: spin 0.8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-  .loading-text {
-    font-family: 'Playfair Display', serif;
-    font-size: 1.1rem; color: var(--text3); font-style: italic;
-  }
-
-  /* ── RESPONSIVE ── */
-  @media (max-width: 900px) {
-    .header { padding: 0 1.25rem; }
-    .nav-list { display: none; }
-    .lang-switcher { display: none; }
-    .theme-btn { display: none; }
-    .menu-btn { display: flex; }
-
-    .page-hero { padding: 1.5rem 1.25rem 1rem; flex-direction: column; align-items: flex-start; gap: 1rem; }
-    .counter-row { width: 100%; justify-content: flex-start; gap: 1.5rem; }
-    .counter { text-align: left; }
-    .counter-num { font-size: 1.75rem; }
-    .legend { padding: 0 1.25rem 1rem; }
-
-    .map-layout { grid-template-columns: 1fr; padding: 0 1.25rem 3rem; gap: 1rem; }
-    .map-main { height: 420px; }
-    .side-panel { height: auto; max-height: 320px; }
-  }
-
-  @media (max-width: 600px) {
-    .page-hero { padding: 1.25rem 1rem 0.75rem; }
-    .page-subtitle { font-size: 0.95rem; }
-    .legend { padding: 0 1rem 0.75rem; gap: 0.85rem; }
-
-    .map-layout { padding: 0 1rem 3rem; }
-    .map-main { height: 340px; }
-
-  }
-`;
-
-// ─────────────────────────────────────────────
-// PURE HELPERS — module scope
-// ─────────────────────────────────────────────
 function createPinIcon(color) {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38">
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="28" height="38" viewBox="0 0 28 38" aria-hidden="true">
     <path d="M14 0C6.268 0 0 6.268 0 14c0 9.333 14 24 14 24S28 23.333 28 14C28 6.268 21.732 0 14 0z" fill="${color}" opacity="0.92"/>
     <circle cx="14" cy="14" r="5" fill="white" opacity="0.9"/>
   </svg>`;
   return L.divIcon({ html: svg, className: "", iconSize: [28, 38], iconAnchor: [14, 38], popupAnchor: [0, -40] });
 }
 
-// Inner component — stable because it lives at module scope
+// Con "riduci movimento" la mappa si sposta senza animazione.
 function MapFlyTo({ coords }) {
   const map = useMap();
   useEffect(() => {
-    if (coords) map.flyTo(coords, 5, { duration: 1.2 });
+    if (!coords) return;
+    const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduce) map.setView(coords, 5);
+    else map.flyTo(coords, 5, { duration: 1.2 });
   }, [coords, map]);
   return null;
 }
 
-// ─────────────────────────────────────────────
-// MAIN COMPONENT
-// ─────────────────────────────────────────────
-export default function TravelMap() {
-  const { t, i18n } = useTranslation();
-  const lang = i18n.language;
+// Coordinate salvate nel DB (colonne lat/lng). Un post senza coordinate
+// non compare sulla mappa, ma resta nel blog.
+const getCoords = (post) =>
+  Number.isFinite(post.lat) && Number.isFinite(post.lng) ? [post.lat, post.lng] : null;
+
+export default function TravelMap({ route }) {
+  const { t } = useTranslation();
+  const lang = route.lang;
   const { theme, toggle } = useTheme();
 
   const [posts,          setPosts]         = useState([]);
@@ -425,7 +65,6 @@ export default function TravelMap() {
   const [menuOpen,       setMenuOpen]      = useState(false);
   const [error,          setError]         = useState(null);
 
-  // fetch
   useEffect(() => {
     (async () => {
       const { data, error } = await fetchPublishedPosts();
@@ -435,280 +74,176 @@ export default function TravelMap() {
     })();
   }, []);
 
-  // lock body scroll when drawer open
   useEffect(() => {
     document.body.style.overflow = menuOpen ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [menuOpen]);
 
   useEffect(() => {
-    setPageMeta({ title: "Mappa dei viaggi", description: "Tutti i viaggi del blog su una mappa: clicca un segnaposto per leggere il racconto.", path: paths.map });
-  }, []);
+    setPageMeta({ lang, title: t("meta.mapTitle"), description: t("meta.mapDescription"), path: pathFor.map(lang) });
+  }, [lang, t]);
 
-  const goBack = useCallback(() => {
+  // Il blog si apre con un eventuale filtro di categoria (letto da TravelBlog).
+  const goBlog = (category = "all") => {
     setMenuOpen(false);
-    navigateTo(paths.home);
-  }, []);
-  // L'articolo si apre alla sua pagina (/articoli/<slug>); "indietro" torna qui.
-  const openArticle = (post) => navigateTo(paths.article(postKey(post)));
-
-  // helpers
-  const getT = (post) => {
-    const l = LANG_KEYS.includes(lang) ? lang : "en";
-    return {
-      title:       post[`title_${l}`]       || post.title_en       || post.title_it       || "—",
-      subtitle:    post[`subtitle_${l}`]    || post.subtitle_en    || "",
-      destination: post[`destination_${l}`] || post.destination_en || "",
-      excerpt:     post[`excerpt_${l}`]     || post.excerpt_en     || "",
-      body:        post[`body_${l}`]        || post.body_en        || "",
-    };
+    navigateTo(pathFor.home(lang), { state: { category } });
+    window.scrollTo({ top: 0, behavior: "instant" });
   };
+  // L'articolo si apre alla sua pagina; "indietro" torna alla mappa.
+  const openArticle = (post) => navigateTo(pathFor.article(lang, postKey(post)));
 
-  // Coordinate salvate nel DB (colonne lat/lng). Un post senza coordinate
-  // non compare sulla mappa, ma resta nel blog.
-  const getCoords = (post) =>
-    Number.isFinite(post.lat) && Number.isFinite(post.lng) ? [post.lat, post.lng] : null;
-
-  const formatDate = (d) => {
-    if (!d) return "";
-    const [y, m] = d.split("-");
-    return new Date(y, (m || 1) - 1).toLocaleDateString(lang, { month: "long", year: "numeric" });
-  };
-
-  const categoryLabels = {
-    culture:   t("categories.culture"),
-    adventure: t("categories.adventure"),
-    nature:    t("categories.nature"),
-    food:      t("categories.food"),
-    sea:       t("categories.sea"),
-  };
-
-  // derived
   const postsWithCoords  = posts.filter(p => getCoords(p));
-  const filtered         = activeCategory
-    ? postsWithCoords.filter(p => p.category === activeCategory)
-    : postsWithCoords;
+  const filtered         = activeCategory ? postsWithCoords.filter(p => p.category === activeCategory) : postsWithCoords;
   const uniqueCountries  = new Set(posts.map(p => p.destination_en || p.destination_it)).size;
   const uniqueContinents = new Set(posts.map(p => p.continent)).size;
 
-  // ── loading state ──
-  if (loading) return (
-    <>
-      <style>{STYLES}</style>
-      <div className="map-root">
-        <div className="loading">
-          <div className="spinner" />
-          <p className="loading-text">Caricamento mappa…</p>
-        </div>
-      </div>
-    </>
-  );
-
-  // ─────────────────────────────────────────
-  // RENDER
-  // ─────────────────────────────────────────
   return (
-    <>
-      <style>{STYLES}</style>
-      <div className="map-root">
+    <div className="page-root">
+      <SiteHeader
+        route={route}
+        current="map"
+        theme={theme}
+        onToggleTheme={toggle}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        onBlog={goBlog}
+        wide
+      />
 
-        {/* ── HEADER ── */}
-        <header className="header">
-          <div className="header-inner">
-
-            <a className="logo" {...linkProps(paths.home, goBack)}>
-              <em>viaggiare</em>·ontheroad
-            </a>
-
-            <div className="header-right">
-              {/* Desktop nav — inlined, no sub-component */}
-              <ul className="nav-list">
-                <li><a {...linkProps(paths.home, goBack)}>{t("nav.destinations")}</a></li>
-                <li><a className="active">🗺 {t("nav.map") || "Mappa"}</a></li>
-              </ul>
-
-              <button className="theme-btn" onClick={toggle} aria-label="Cambia tema">
-                {theme === "dark" ? "☀️" : "🌙"}
-              </button>
-
-              <div className="lang-switcher">
-                {LANGUAGES.map(l => (
-                  <button
-                    key={l.code}
-                    className={`lang-btn${lang === l.code ? " active" : ""}`}
-                    onClick={() => i18n.changeLanguage(l.code)}
-                  >{l.flag}</button>
+      <main id="main" className="page-main" tabIndex={-1}>
+        {loading ? (
+          <div className="loading" role="status">
+            <div className="spinner" aria-hidden="true" />
+            <p className="loading-text">{t("map.loading")}</p>
+          </div>
+        ) : (
+          <>
+            <div className="page-hero">
+              <div>
+                <div className="page-eyebrow">{t("map.eyebrow")}</div>
+                <h1 className="page-title">{t("map.titleLine1")}<br />{t("map.titleA")} <em>{t("map.titleEm")}</em></h1>
+                <p className="page-subtitle">{t("map.subtitle")}</p>
+              </div>
+              <ul className="counter-row">
+                {[
+                  [postsWithCoords.length, t("map.counters.trips")],
+                  [uniqueCountries, t("map.counters.countries")],
+                  [uniqueContinents, t("map.counters.continents")],
+                ].map(([n, label]) => (
+                  <li className="counter" key={label}>
+                    <span className="counter-num">{n}</span>
+                    <span className="counter-label">{label}</span>
+                  </li>
                 ))}
+              </ul>
+            </div>
+
+            {error && (
+              <div className="error-banner" role="alert">⚠️ {t("map.error", { msg: error })}</div>
+            )}
+
+            <div className="legend" role="group" aria-labelledby="legend-label">
+              <span className="legend-label" id="legend-label">{t("map.filterLabel")}</span>
+              {Object.entries(CATEGORY_COLORS).map(([cat, color]) => (
+                <button
+                  key={cat}
+                  className={`legend-item${activeCategory && activeCategory !== cat ? " dimmed" : ""}`}
+                  aria-pressed={activeCategory === cat}
+                  onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
+                >
+                  <span className="legend-dot" style={{ background: color }} aria-hidden="true" />
+                  <span className="legend-text">{t(`categories.${cat}`)}</span>
+                </button>
+              ))}
+              {activeCategory && (
+                <button className="legend-clear" onClick={() => setActiveCategory(null)}>{t("map.clear")}</button>
+              )}
+            </div>
+
+            <div className="map-layout">
+              <div className="map-main">
+                <MapContainer
+                  center={[20, 10]} zoom={2} minZoom={2} maxZoom={10}
+                  scrollWheelZoom
+                  style={{ height: "100%", width: "100%" }}
+                >
+                  <TileLayer
+                    url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                  />
+                  <MapFlyTo coords={flyTarget} />
+                  {filtered.map(post => {
+                    const coords = getCoords(post);
+                    const tr     = postText(post, lang);
+                    const color  = CATEGORY_COLORS[post.category] || "#c9a84c";
+                    return (
+                      <Marker
+                        key={post.id}
+                        position={coords}
+                        icon={createPinIcon(color)}
+                        title={tr.title}
+                        alt={tr.title}
+                        eventHandlers={{ click: () => setFlyTarget(coords) }}
+                      >
+                        <Popup maxWidth={240} minWidth={210}>
+                          <div className="map-popup">
+                            <div className="map-popup-cat">
+                              <span className="legend-dot" style={{ background: color }} aria-hidden="true" />
+                              {tr.destination} · {t(`categories.${post.category}`)}
+                            </div>
+                            {post.image_url && (
+                              <img className="map-popup-img" {...responsiveImage(post.image_url, ...IMG.popup)} alt="" width="210" height="100" decoding="async" />
+                            )}
+                            <div className="map-popup-title">{tr.title}</div>
+                            <div className="map-popup-dest">{tr.subtitle}</div>
+                            <p className="map-popup-excerpt">{tr.excerpt}</p>
+                            <a className="map-popup-btn" {...linkProps(pathFor.article(lang, postKey(post)), () => openArticle(post))}>
+                              {t("map.readStory")}
+                            </a>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    );
+                  })}
+                </MapContainer>
               </div>
 
-              <button
-                className="menu-btn"
-                onClick={() => setMenuOpen(o => !o)}
-                aria-label="Menu"
-              >
-                {menuOpen ? "✕" : "☰"}
-              </button>
+              <section className="side-panel" aria-labelledby="side-panel-title">
+                <h2 className="side-panel-title" id="side-panel-title">
+                  {activeCategory
+                    ? `${t(`categories.${activeCategory}`)} (${filtered.length})`
+                    : t("map.allTrips", { count: postsWithCoords.length })}
+                </h2>
+                <ul className="side-list">
+                  {filtered.map(post => {
+                    const tr    = postText(post, lang);
+                    const color = CATEGORY_COLORS[post.category] || "#c9a84c";
+                    return (
+                      <li key={post.id}>
+                        <button
+                          className="side-card"
+                          aria-label={t("map.showOnMap", { title: tr.title })}
+                          onClick={() => setFlyTarget(getCoords(post))}
+                        >
+                          {post.image_url && (
+                            <img className="side-card-img" {...responsiveImage(post.image_url, ...IMG.thumb)} alt="" width="62" height="46" loading="lazy" decoding="async" />
+                          )}
+                          <span className="side-card-body">
+                            <span className="side-card-cat">{t(`categories.${post.category}`)}</span>
+                            <span className="side-card-title">{tr.title}</span>
+                            <span className="side-card-dest">{tr.destination} · {formatMonth(post.date, lang)}</span>
+                          </span>
+                          <span className="side-card-dot" style={{ background: color }} aria-hidden="true" />
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </section>
             </div>
-          </div>
-        </header>
-
-        {/* ── MOBILE DRAWER — opacity/pointer-events, never unmounts ── */}
-        <nav className={`mobile-drawer${menuOpen ? " open" : ""}`} aria-hidden={!menuOpen}>
-          {/* Inlined nav links — direct goBack() call, no sub-component */}
-          <ul className="nav-list">
-            <li><a {...linkProps(paths.home, goBack)}>{t("nav.destinations")}</a></li>
-            <li><a className="active">🗺 {t("nav.map") || "Mappa"}</a></li>
-          </ul>
-
-          <div className="lang-switcher">
-            {LANGUAGES.map(l => (
-              <button
-                key={l.code}
-                className={`lang-btn${lang === l.code ? " active" : ""}`}
-                onClick={() => { i18n.changeLanguage(l.code); setMenuOpen(false); }}
-              >{l.flag} {l.label}</button>
-            ))}
-          </div>
-
-          <div
-            className="theme-row"
-            onClick={() => { toggle(); setMenuOpen(false); }}
-          >
-            <button className="theme-btn" onClick={e => e.stopPropagation()}>
-              {theme === "dark" ? "☀️" : "🌙"}
-            </button>
-            <span>{theme === "dark" ? "Tema chiaro" : "Tema scuro"}</span>
-          </div>
-        </nav>
-
-        {/* ── PAGE HERO ── */}
-        <div className="page-hero">
-          <div>
-            <div className="page-eyebrow">Il mondo visitato</div>
-            <h1 className="page-title">Ogni pin,<br />una <em>storia</em></h1>
-            <p className="page-subtitle">Clicca su un segnaposto per leggere il racconto. Filtra per categoria.</p>
-          </div>
-          <div className="counter-row">
-            <div className="counter">
-              <div className="counter-num">{postsWithCoords.length}</div>
-              <div className="counter-label">Viaggi</div>
-            </div>
-            <div className="counter">
-              <div className="counter-num">{uniqueCountries}</div>
-              <div className="counter-label">Paesi</div>
-            </div>
-            <div className="counter">
-              <div className="counter-num">{uniqueContinents}</div>
-              <div className="counter-label">Continenti</div>
-            </div>
-          </div>
-        </div>
-
-        {error && (
-          <div className="error-banner" role="alert">⚠️ Impossibile caricare i viaggi: {error}</div>
+          </>
         )}
-
-        {/* ── LEGEND ── */}
-        <div className="legend">
-          <span className="legend-label">Filtra:</span>
-          {Object.entries(CATEGORY_COLORS).map(([cat, color]) => (
-            <div
-              key={cat}
-              className={`legend-item${activeCategory && activeCategory !== cat ? " dimmed" : ""}`}
-              onClick={() => setActiveCategory(activeCategory === cat ? null : cat)}
-            >
-              <div className="legend-dot" style={{ background: color }} />
-              <span className="legend-text">{categoryLabels[cat]}</span>
-            </div>
-          ))}
-          {activeCategory && (
-            <span className="legend-clear" onClick={() => setActiveCategory(null)}>✕ Tutti</span>
-          )}
-        </div>
-
-        {/* ── MAP + SIDE PANEL ── */}
-        <div className="map-layout">
-          <div className="map-main">
-            <MapContainer
-              center={[20, 10]} zoom={2} minZoom={2} maxZoom={10}
-              scrollWheelZoom
-              style={{ height: "100%", width: "100%" }}
-            >
-              <TileLayer
-                url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              />
-              <MapFlyTo coords={flyTarget} />
-              {filtered.map(post => {
-                const coords = getCoords(post);
-                if (!coords) return null;
-                const tr    = getT(post);
-                const color = CATEGORY_COLORS[post.category] || "#c9a84c";
-                return (
-                  <Marker
-                    key={post.id}
-                    position={coords}
-                    icon={createPinIcon(color)}
-                    eventHandlers={{ click: () => setFlyTarget(coords) }}
-                  >
-                    <Popup maxWidth={240} minWidth={210}>
-                      <div className="map-popup">
-                        <div className="map-popup-cat" style={{ color }}>
-                          {tr.destination} · {categoryLabels[post.category]}
-                        </div>
-                        {post.image_url && (
-                          <img className="map-popup-img" {...responsiveImage(post.image_url, ...IMG.popup)} alt={tr.title} width="210" height="100" decoding="async" />
-                        )}
-                        <div className="map-popup-title">{tr.title}</div>
-                        <div className="map-popup-dest">{tr.subtitle}</div>
-                        <p className="map-popup-excerpt">{tr.excerpt}</p>
-                        <a className="map-popup-btn" {...linkProps(paths.article(postKey(post)), () => openArticle(post))}>
-                          Leggi il racconto →
-                        </a>
-                      </div>
-                    </Popup>
-                  </Marker>
-                );
-              })}
-            </MapContainer>
-          </div>
-
-          <div className="side-panel">
-            <div className="side-panel-title">
-              {activeCategory
-                ? `${categoryLabels[activeCategory]} (${filtered.length})`
-                : `Tutti i viaggi (${postsWithCoords.length})`}
-            </div>
-            {filtered.map(post => {
-              const tr    = getT(post);
-              const color = CATEGORY_COLORS[post.category] || "#c9a84c";
-              return (
-                <div
-                  key={post.id}
-                  className="side-card"
-                  onClick={() => setFlyTarget(getCoords(post))}
-                >
-                  {post.image_url && (
-                    <img className="side-card-img" {...responsiveImage(post.image_url, ...IMG.thumb)} alt={tr.title} width="62" height="46" loading="lazy" decoding="async" />
-                  )}
-                  <div className="side-card-body">
-                    <div className="side-card-cat" style={{ color }}>
-                      {categoryLabels[post.category]}
-                    </div>
-                    <div className="side-card-title">{tr.title}</div>
-                    <div className="side-card-dest">
-                      {tr.destination} · {formatDate(post.date)}
-                    </div>
-                  </div>
-                  <div className="side-card-dot" style={{ background: color }} />
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-
-      </div>
-    </>
+      </main>
+    </div>
   );
 }

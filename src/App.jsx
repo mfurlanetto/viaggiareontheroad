@@ -1,4 +1,5 @@
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import TravelBlog from './TravelBlog'
 import { usePath, parseRoute } from './router'
 
@@ -8,10 +9,18 @@ const TravelMap = lazy(() => import('./TravelMap'))
 
 function App() {
   const route = parseRoute(usePath())
+  const { i18n } = useTranslation()
+
+  // La lingua segue l'URL (anche con indietro/avanti del browser).
+  useEffect(() => {
+    if (i18n.language !== route.lang) i18n.changeLanguage(route.lang)
+    document.documentElement.lang = route.lang
+  }, [route.lang, i18n])
+
   return route.name === 'map'
     ? (
-      <Suspense fallback={<p style={{ padding: '2rem', fontFamily: 'sans-serif' }}>Caricamento mappa…</p>}>
-        <TravelMap />
+      <Suspense fallback={<div className="loading" role="status"><div className="spinner" aria-hidden="true" /></div>}>
+        <TravelMap route={route} />
       </Suspense>
     )
     : <TravelBlog route={route} />

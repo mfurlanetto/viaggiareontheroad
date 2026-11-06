@@ -1,16 +1,27 @@
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
+import { LANGS, DEFAULT_LANG } from './config'
+import { parseRoute } from './router'
+import it from './locales/it'
+import en from './locales/en'
+import fr from './locales/fr'
+import es from './locales/es'
+import de from './locales/de'
 
-const resources = {
-  it: { translation: { nav: { destinations: "Destinazioni", stories: "Storie", guides: "Guide", about: "Chi sono", map: "Mappa" }, hero: { readTime: "min di lettura" }, section: { allTrips: "Tutti i viaggi" }, filter: { continent: "Continente:", category: "Categoria:", all: "Tutti" }, continents: { all: "Tutti", asia: "Asia", europe: "Europa", america: "America", africa: "Africa", oceania: "Oceania" }, categories: { all: "Tutti", culture: "Cultura", adventure: "Avventura", nature: "Natura", food: "Gastronomia", sea: "Mare" }, modal: { back: "← Torna agli articoli", read: "di lettura" }, empty: "Nessun articolo trovato.", footer: "Storie dal mondo, scritte con lentezza", loading: "Caricamento articoli...", error: "Errore nel caricamento." } },
-  en: { translation: { nav: { destinations: "Destinations", stories: "Stories", guides: "Guides", about: "About me", map: "Map" }, hero: { readTime: "min read" }, section: { allTrips: "All trips" }, filter: { continent: "Continent:", category: "Category:", all: "All" }, continents: { all: "All", asia: "Asia", europe: "Europe", america: "America", africa: "Africa", oceania: "Oceania" }, categories: { all: "All", culture: "Culture", adventure: "Adventure", nature: "Nature", food: "Food", sea: "Sea" }, modal: { back: "← Back to articles", read: "read" }, empty: "No articles found.", footer: "Stories from the world, written slowly", loading: "Loading articles...", error: "Error loading articles." } },
-  fr: { translation: { nav: { destinations: "Destinations", stories: "Histoires", guides: "Guides", about: "À propos", map: "Carte" }, hero: { readTime: "min de lecture" }, section: { allTrips: "Tous les voyages" }, filter: { continent: "Continent :", category: "Catégorie :", all: "Tous" }, continents: { all: "Tous", asia: "Asie", europe: "Europe", america: "Amérique", africa: "Afrique", oceania: "Océanie" }, categories: { all: "Tous", culture: "Culture", adventure: "Aventure", nature: "Nature", food: "Gastronomie", sea: "Mer" }, modal: { back: "← Retour aux articles", read: "de lecture" }, empty: "Aucun article trouvé.", footer: "Histoires du monde, écrites lentement", loading: "Chargement...", error: "Erreur de chargement." } },
-  es: { translation: { nav: { destinations: "Destinos", stories: "Historias", guides: "Guías", about: "Sobre mí", map: "Mapa" }, hero: { readTime: "min de lectura" }, section: { allTrips: "Todos los viajes" }, filter: { continent: "Continente:", category: "Categoría:", all: "Todos" }, continents: { all: "Todos", asia: "Asia", europe: "Europa", america: "América", africa: "África", oceania: "Oceanía" }, categories: { all: "Todos", culture: "Cultura", adventure: "Aventura", nature: "Naturaleza", food: "Gastronomía", sea: "Mar" }, modal: { back: "← Volver", read: "de lectura" }, empty: "No se encontraron artículos.", footer: "Historias del mundo, escritas con calma", loading: "Cargando...", error: "Error al cargar." } },
-  de: { translation: { nav: { destinations: "Reiseziele", stories: "Geschichten", guides: "Reiseführer", about: "Über mich", map: "Karte" }, hero: { readTime: "min Lesezeit" }, section: { allTrips: "Alle Reisen" }, filter: { continent: "Kontinent:", category: "Kategorie:", all: "Alle" }, continents: { all: "Alle", asia: "Asien", europe: "Europa", america: "Amerika", africa: "Afrika", oceania: "Ozeanien" }, categories: { all: "Alle", culture: "Kultur", adventure: "Abenteuer", nature: "Natur", food: "Gastronomie", sea: "Meer" }, modal: { back: "← Zurück", read: "Lesezeit" }, empty: "Keine Artikel gefunden.", footer: "Geschichten aus der Welt, langsam geschrieben", loading: "Laden...", error: "Ladefehler." } },
-}
+const resources = Object.fromEntries(
+  Object.entries({ it, en, fr, es, de }).map(([l, translation]) => [l, { translation }])
+)
+
+// La lingua viene dall'URL (/en/..., /fr/...; senza prefisso = italiano):
+// si parte gia' con quella giusta, senza un primo render nella lingua sbagliata.
+const initial = typeof window !== 'undefined' ? parseRoute(window.location.pathname).lang : DEFAULT_LANG
 
 i18n.use(initReactI18next).init({
-  resources, lng: 'it', fallbackLng: 'en',
+  resources,
+  lng: initial,
+  fallbackLng: 'it',
+  supportedLngs: LANGS,
+  returnObjects: true,
   interpolation: { escapeValue: false },
 })
 
