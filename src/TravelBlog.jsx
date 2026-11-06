@@ -5,6 +5,7 @@ import { supabase } from "./supabaseClient";
 import { fetchPublishedPosts } from "./postsApi";
 import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
+import { responsiveImage, IMG } from "./images";
 
 // ─────────────────────────────────────────────
 // CONSTANTS (module scope — never recreated)
@@ -18,6 +19,7 @@ const LANGUAGES = [
 ];
 const LANG_KEYS      = ["it", "en", "fr", "es", "de"];
 const CAROUSEL_INTERVAL = 4500;
+const CONTACT_EMAIL = "viaggiareontheroad23@gmail.com";
 
 // ─────────────────────────────────────────────
 // STATIC PAGE COMPONENTS (outside TravelBlog)
@@ -27,7 +29,6 @@ const CAROUSEL_INTERVAL = 4500;
 function AboutPage({ onBack, posts }) {
   const countries   = new Set(posts.map(p => p.destination_it || p.destination_en)).size;
   const continents  = new Set(posts.map(p => p.continent)).size;
-  const kmLabel     = posts.length > 0 ? `${Math.round(posts.length * 8.4)}k` : "—";
 
   return (
     <div className="about-wrap">
@@ -44,18 +45,21 @@ function AboutPage({ onBack, posts }) {
         di un fiordo islandese alle tre di notte.
       </p>
 
-      <img
-        className="about-photo"
-        src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=900&q=80"
-        alt="Viaggiatore con zaino guarda un panorama montano"
-      />
+      <figure className="about-figure">
+        <img
+          className="about-photo"
+          src="https://images.unsplash.com/photo-1476514525535-07fb3b4ae5f1?w=900&q=80"
+          alt="Viaggiatore con zaino guarda un panorama montano"
+          width="860" height="420" loading="lazy" decoding="async"
+        />
+        <figcaption>Foto: <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></figcaption>
+      </figure>
 
       <div className="about-stats">
         {[
           { num: posts.length, label: "Racconti" },
           { num: countries,    label: "Paesi" },
           { num: continents,   label: "Continenti" },
-          { num: kmLabel,      label: "Km stimati" },
         ].map(s => (
           <div key={s.label}>
             <div className="about-stat-num">{s.num}</div>
@@ -80,7 +84,7 @@ function AboutPage({ onBack, posts }) {
           { icon: "🐢", title: "Viaggi lenti",     text: "Un luogo alla volta, con tutto il tempo per capirlo davvero." },
           { icon: "✍️", title: "Scrittura onesta",  text: "Niente filtri o sponsor nascosti. Solo quello che ho vissuto." },
           { icon: "🌍", title: "Rispetto locale",   text: "Ogni posto ha una cultura. L'obiettivo è osservarla, non consumarla." },
-          { icon: "📷", title: "Foto proprie",      text: "Tutte le immagini sono scattate sul posto. Nessuna stock photo." },
+          { icon: "📷", title: "Foto, in trasparenza", text: "Per ora alcune immagini vengono da Unsplash: le sto sostituendo, una alla volta, con le mie foto di viaggio." },
         ].map(v => (
           <div key={v.title} className="about-value-card">
             <div className="about-value-icon">{v.icon}</div>
@@ -93,7 +97,7 @@ function AboutPage({ onBack, posts }) {
       <div className="about-body">
         <p>Hai domande su un viaggio? Vuoi collaborare? Scrivimi — rispondo a tutti.</p>
       </div>
-      <a className="about-contact-btn" href="mailto:ciao@viaggilontani.it">Scrivimi ✉️</a>
+      <a className="about-contact-btn" href={`mailto:${CONTACT_EMAIL}`}>Scrivimi ✉️</a>
     </div>
   );
 }
@@ -108,7 +112,7 @@ function PrivacyPage({ onBack }) {
 
       <h2>1. Titolare del trattamento</h2>
       <p>Il blog <strong>viaggiare·ontheroad</strong> è gestito a titolo personale.
-        Contatto: <a href="mailto:ciao@viaggilontani.it">ciao@viaggilontani.it</a></p>
+        Contatto: <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a></p>
 
       <h2>2. Dati raccolti</h2>
       <p>Questo sito non raccoglie dati personali tramite form o registrazione.
@@ -149,7 +153,7 @@ function PrivacyPage({ onBack }) {
         all'autorità di controllo (in Italia, il Garante per la protezione dei
         dati personali, <a href="https://www.garanteprivacy.it">garanteprivacy.it</a>).
         Per esercitare i tuoi diritti scrivi a{" "}
-        <a href="mailto:ciao@viaggilontani.it">ciao@viaggilontani.it</a>.</p>
+        <a href={`mailto:${CONTACT_EMAIL}`}>{CONTACT_EMAIL}</a>.</p>
 
       <h2>6. Modifiche</h2>
       <p>Questa policy può essere aggiornata. Le modifiche saranno visibili
@@ -544,6 +548,7 @@ const STYLES = `
     border-bottom: 1px solid var(--border); flex-wrap: wrap;
   }
   .modal-text { font-size: 1rem; line-height: 1.9; color: var(--text2); white-space: pre-line; }
+  .modal-status { color: var(--text3); font-style: italic; }
   /* Light mode: dark fill + gold text */
   .modal-close {
     display: block; margin: 2rem auto 0;
@@ -728,11 +733,14 @@ const STYLES = `
     font-size: 1.1rem; line-height: 1.85; color: var(--text2);
     margin-bottom: 2.5rem; border-left: 3px solid var(--gold-btn); padding-left: 1.5rem;
   }
-  .about-photo { width: 100%; height: 420px; object-fit: cover; border-radius: 8px; margin-bottom: 2.5rem; }
+  .about-figure { margin: 0 0 2.5rem; }
+  .about-photo { width: 100%; height: 420px; object-fit: cover; border-radius: 8px; display: block; }
+  .about-figure figcaption { font-size: 0.8rem; color: var(--text3); margin-top: 0.4rem; text-align: right; }
+  .about-figure figcaption a { color: inherit; }
   .about-body { font-size: 1rem; line-height: 1.9; color: var(--text2); }
   .about-body p { margin-bottom: 1.5rem; }
   .about-stats {
-    display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.5rem;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 1.5rem;
     margin: 3rem 0; padding: 2rem; background: var(--bg2);
     border-radius: 8px; border: 1px solid var(--border);
   }
@@ -790,7 +798,6 @@ const STYLES = `
     .footer-inner { grid-template-columns: 1fr 1fr; }
     .footer-brand { grid-column: 1 / -1; }
 
-    .about-stats { grid-template-columns: repeat(2, 1fr); }
     .about-values { grid-template-columns: 1fr; }
   }
 
@@ -827,7 +834,8 @@ const STYLES = `
     .footer-inner { grid-template-columns: 1fr; gap: 1.5rem; }
     .footer-bottom { flex-direction: column; align-items: flex-start; }
 
-    .about-stats { grid-template-columns: 1fr 1fr; gap: 1rem; padding: 1.25rem; }
+    .about-stats { gap: 1rem; padding: 1.25rem; }
+    .about-stat-num { font-size: 2rem; }
     .about-photo { height: 260px; }
     .about-wrap, .privacy-wrap { padding: 2.5rem 1rem 4rem; }
   }
@@ -862,7 +870,7 @@ export default function TravelBlog({ onMap }) {
     ? galleryData.images
     : [];
   // articolo aperto con testo completo (caricato solo all'apertura)
-  const openPost = usePostBody(selectedPost);
+  const [openPost, bodyStatus] = usePostBody(selectedPost);
 
   // carousel
   const [carouselIdx, setCarouselIdx] = useState(0);
@@ -928,14 +936,16 @@ export default function TravelBlog({ onMap }) {
 
   // ── navigation ──
   // Single source of truth: always call navigate() to change page.
-  const navigate = useCallback((target) => {
+  // Per il blog si puo' passare una categoria iniziale (es. "Storie" = cultura):
+  // i filtri vengono impostati qui, in un solo punto, cosi' non si sovrascrivono.
+  const navigate = useCallback((target, { category = "all" } = {}) => {
     setPage(target);
     setMenuOpen(false);
     setSelectedPost(null);
     setGalleryOpen(false);
     if (target === "blog") {
       setActiveContinent("all");
-      setActiveCategory("all");
+      setActiveCategory(category);
     }
     window.scrollTo({ top: 0, behavior: "instant" });
   }, []);
@@ -1008,7 +1018,7 @@ export default function TravelBlog({ onMap }) {
               {/* Desktop nav — inline, no sub-component */}
               <ul className="nav-list">
                 <li><a onClick={() => navigate("blog")}>{t("nav.destinations")}</a></li>
-                <li><a onClick={() => { setActiveCategory("culture"); setPage("blog"); window.scrollTo({top:0,behavior:"instant"}); }}>{t("nav.stories")}</a></li>
+                <li><a onClick={() => navigate("blog", { category: "culture" })}>{t("nav.stories")}</a></li>
                 <li><a onClick={() => onMap?.()}>🗺 Mappa</a></li>
                 <li><a onClick={() => navigate("about")}>Chi siamo</a></li>
               </ul>
@@ -1039,7 +1049,7 @@ export default function TravelBlog({ onMap }) {
           {/* Inline nav links — no sub-component, direct navigate() calls */}
           <ul className="nav-list">
             <li><a onClick={() => navigate("blog")}>{t("nav.destinations")}</a></li>
-            <li><a onClick={() => { setActiveCategory("culture"); navigate("blog"); }}>{t("nav.stories")}</a></li>
+            <li><a onClick={() => navigate("blog", { category: "culture" })}>{t("nav.stories")}</a></li>
             <li><a onClick={() => { setMenuOpen(false); onMap?.(); }}>🗺 Mappa</a></li>
             <li><a onClick={() => navigate("about")}>Chi siamo</a></li>
           </ul>
@@ -1108,7 +1118,10 @@ export default function TravelBlog({ onMap }) {
                             className="carousel-slide"
                             onClick={() => setSelectedPost(post)}
                           >
-                            <img src={post.image_url} alt={tr.title} />
+                            <img {...responsiveImage(post.image_url, ...IMG.hero)} alt={tr.title}
+                              width="1200" height="520" decoding="async"
+                              loading={post.id === carouselPosts[0].id ? "eager" : "lazy"}
+                              fetchPriority={post.id === carouselPosts[0].id ? "high" : "auto"} />
                             <div className="hero-overlay">
                               <span className="hero-tag">{tr.destination} · {t(`categories.${post.category}`)}</span>
                               <h1 className="hero-title">{tr.title}</h1>
@@ -1181,7 +1194,8 @@ export default function TravelBlog({ onMap }) {
                   return (
                     <article key={post.id} className="card" onClick={() => setSelectedPost(post)}>
                       <div className="card-img-wrap">
-                        <img src={post.image_url} alt={tr.title} />
+                        <img {...responsiveImage(post.image_url, ...IMG.card)} alt={tr.title}
+                          width="400" height="215" loading="lazy" decoding="async" />
                       </div>
                       <div className="card-cat">{tr.destination} · {t(`categories.${post.category}`)}</div>
                       <h2 className="card-title">{tr.title}</h2>
@@ -1259,21 +1273,21 @@ export default function TravelBlog({ onMap }) {
               <ul>
                 <li><a onClick={() => navigate("blog")}>Tutti i viaggi</a></li>
                 <li><a onClick={() => onMap?.()}>Mappa interattiva</a></li>
-                <li><a onClick={() => { setActiveCategory("culture"); setPage("blog"); }}>Cultura</a></li>
-                <li><a onClick={() => { setActiveCategory("nature");  setPage("blog"); }}>Natura</a></li>
+                <li><a onClick={() => navigate("blog", { category: "culture" })}>Cultura</a></li>
+                <li><a onClick={() => navigate("blog", { category: "nature" })}>Natura</a></li>
               </ul>
             </div>
             <div className="footer-col">
               <h4>Il progetto</h4>
               <ul>
                 <li><a onClick={() => navigate("about")}>Chi siamo</a></li>
-                <li><a href="mailto:ciao@viaggilontani.it">Contatti</a></li>
+                <li><a href={`mailto:${CONTACT_EMAIL}`}>Contatti</a></li>
                 <li><a onClick={() => navigate("privacy")}>Privacy Policy</a></li>
               </ul>
             </div>
           </div>
           <div className="footer-bottom">
-            <span className="brand">© 2025 viaggiare·ontheroad</span>
+            <span className="brand">© {new Date().getFullYear()} viaggiare·ontheroad · Alcune foto: <a href="https://unsplash.com" target="_blank" rel="noopener noreferrer">Unsplash</a></span>
             <a onClick={() => navigate("privacy")}>Privacy Policy</a>
           </div>
         </footer>
@@ -1285,7 +1299,8 @@ export default function TravelBlog({ onMap }) {
           return (
             <div className="modal-overlay" onClick={() => setSelectedPost(null)}>
               <div className="modal" onClick={e => e.stopPropagation()}>
-                <img className="modal-hero-img" src={selectedPost.image_url} alt={tr.title} />
+                <img className="modal-hero-img" {...responsiveImage(selectedPost.image_url, ...IMG.modal)} alt={tr.title}
+                  width="720" height="300" decoding="async" />
                 <div className="modal-body">
                   <div className="modal-cat">{tr.destination} · {t(`categories.${selectedPost.category}`)}</div>
                   <h2 className="modal-title">{tr.title}</h2>
@@ -1295,7 +1310,9 @@ export default function TravelBlog({ onMap }) {
                     <span>🌍 {t(`continents.${selectedPost.continent}`)}</span>
                     <span>⏱ {selectedPost.read_time} {t("modal.read")}</span>
                   </div>
-                  <p className="modal-text">{tr.body}</p>
+                  {bodyStatus === "loading" && <p className="modal-text modal-status">Caricamento del testo…</p>}
+                  {bodyStatus === "error" && <p className="modal-text modal-status">Non è stato possibile caricare il testo dell'articolo. Riprova più tardi.</p>}
+                  {bodyStatus === "ready" && <p className="modal-text">{tr.body}</p>}
 
                   {/* ── GALLERY ── */}
                   {postImages.length > 0 && (

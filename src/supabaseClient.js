@@ -1,15 +1,13 @@
 import { createClient } from '@supabase/supabase-js'
 
-// Supabase sta dismettendo la chiave "anon" in favore della "publishable key".
-// Accettiamo entrambe: la nuova ha la precedenza.
+// Chiave pubblica (publishable key, formato sb_publishable_...). Le vecchie chiavi
+// JWT "anon" del progetto sono disattivate, quindi non sono piu' accettate qui.
 const url = import.meta.env.VITE_SUPABASE_URL
-const key =
-  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
-  import.meta.env.VITE_SUPABASE_ANON_KEY
+const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
 
 const missing = []
 if (!url) missing.push('VITE_SUPABASE_URL')
-if (!key) missing.push('VITE_SUPABASE_PUBLISHABLE_KEY (oppure VITE_SUPABASE_ANON_KEY)')
+if (!key) missing.push('VITE_SUPABASE_PUBLISHABLE_KEY')
 
 // Messaggio leggibile invece di un'eccezione all'import che lascia la pagina bianca.
 export const supabaseConfigError = missing.length
