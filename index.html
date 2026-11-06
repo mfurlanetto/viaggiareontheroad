@@ -5,10 +5,26 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-    <!-- Identità -->
+    <!-- Meta della pagina: scripts/prerender.mjs sostituisce questo blocco per
+         ogni pagina generata (articoli, Chi siamo, Privacy, Mappa). -->
+    <!-- page-meta:start -->
     <title>Viaggiare On The Road</title>
     <meta name="description" content="Racconti di viaggio lenti, onesti e scritti con cura." />
     <link rel="canonical" href="https://viaggiareontheroad.vercel.app/" />
+    <meta property="og:title" content="Viaggiare On The Road" />
+    <meta property="og:description" content="Racconti di viaggio lenti, onesti e scritti con cura." />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://viaggiareontheroad.vercel.app/" />
+    <meta property="og:image" content="https://viaggiareontheroad.vercel.app/og-image.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="viaggiare·ontheroad — Racconti di viaggio lenti, onesti e scritti con cura." />
+    <meta name="twitter:title" content="Viaggiare On The Road" />
+    <meta name="twitter:description" content="Racconti di viaggio lenti, onesti e scritti con cura." />
+    <meta name="twitter:image" content="https://viaggiareontheroad.vercel.app/og-image.jpg" />
+    <!-- page-meta:end -->
+
+    <!-- Identità -->
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -21,27 +37,22 @@
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 
-    <!-- Open Graph (WhatsApp, Telegram, Facebook, iMessage) -->
-    <meta property="og:title" content="Viaggiare On The Road" />
-    <meta property="og:description" content="Racconti di viaggio lenti, onesti e scritti con cura." />
-    <meta property="og:type" content="website" />
-    <meta property="og:url" content="https://viaggiareontheroad.vercel.app/" />
+    <!-- Open Graph / Twitter comuni a tutte le pagine -->
     <meta property="og:site_name" content="Viaggiare On The Road" />
     <meta property="og:locale" content="it_IT" />
-    <meta property="og:image" content="https://viaggiareontheroad.vercel.app/og-image.jpg" />
-    <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content="viaggiare·ontheroad — Racconti di viaggio lenti, onesti e scritti con cura." />
-
-    <!-- Twitter/X card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Viaggiare On The Road" />
-    <meta name="twitter:description" content="Racconti di viaggio lenti, onesti e scritti con cura." />
-    <meta name="twitter:image" content="https://viaggiareontheroad.vercel.app/og-image.jpg" />
+
+    <!-- Contenuto pre-renderizzato: visibile finche' React non monta l'app -->
+    <style>
+      .prerender { max-width: 760px; margin: 0 auto; padding: 2.5rem 1.25rem 4rem;
+        font-family: Lato, -apple-system, sans-serif; line-height: 1.7; color: #1a1a18; background: #faf8f5; }
+      .prerender h1 { font-family: "Playfair Display", Georgia, serif; line-height: 1.2; }
+      .prerender img { width: 100%; height: auto; border-radius: 6px; }
+      .prerender a { color: #b8962e; }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root"><!-- prerender --></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -72,6 +72,24 @@ alter table public.posts add constraint posts_lat_range check (lat is null or la
 alter table public.posts add constraint posts_lng_range check (lng is null or lng between -180 and 180);
 --    + popolate con le coordinate prima scritte in src/TravelMap.jsx.
 
+-- 5) posts_add_slug + posts_slug_private_helpers
+--    Colonna posts.slug (NOT NULL, UNIQUE, formato [a-z0-9-]) per gli URL
+--    /articoli/<slug>; popolata dai titoli italiani. Trigger posts_set_slug
+--    (SECURITY DEFINER) genera lo slug quando manca, con suffisso -2, -3... sui
+--    duplicati; uno slug esistente non viene mai cambiato. La funzione slugify sta
+--    nello schema private (non esposto all'API). Estensione unaccent.
+--
+-- 6) auto_rebuild_on_post_change
+--    Estensioni pg_net e pg_cron; schema private (nessun permesso ad anon e
+--    authenticated) con la tabella private.site_rebuild. Trigger su posts (solo
+--    righe pubblicate prima o dopo la modifica) e post_images che segnano
+--    dirty = true; job cron 'site-rebuild' ogni minuto che, se l'ultima modifica
+--    ha piu' di 45 s, chiama via net.http_post l'URL salvato nel Vault come
+--    'vercel_deploy_hook' (deve iniziare con https://api.vercel.com/).
+--    Senza segreto il job non fa nulla e lo annota in private.site_rebuild.note.
+--    site_rebuild_hook_timeout: timeout della chiamata portato a 30 s (il Deploy
+--    Hook risponde in piu' dei 5 s di default; la richiesta arrivava comunque).
+
 -- ───────────── VERIFICHE (SQL editor) ─────────────
 --   set role anon;
 --   select count(*) from public.posts where published = false;   -- atteso 0
@@ -82,6 +100,16 @@ alter table public.posts add constraint posts_lng_range check (lng is null or ln
 --   reset role;
 --
 -- ───────────── RIPRISTINO (solo se serve tornare indietro) ─────────────
+-- 6) select cron.unschedule('site-rebuild');
+--    drop trigger posts_mark_site_dirty on public.posts;
+--    drop trigger post_images_mark_site_dirty on public.post_images;
+--    drop schema private cascade;   -- ATTENZIONE: rimuove anche private.slugify (usata dal 5)
+--    il segreto 'vercel_deploy_hook' si elimina dal Vault nella dashboard Supabase.
+--
+-- 5) drop trigger posts_set_slug on public.posts;
+--    drop function public.posts_set_slug();
+--    alter table public.posts drop column slug;   -- il sito torna senza URL per articolo
+--
 -- 4) drop delle colonne: il frontend tollera la loro assenza (ripiega su select *),
 --    ma la mappa restera' vuota.
 --    alter table public.posts drop column lat, drop column lng;
