@@ -38,13 +38,23 @@ I post si gestiscono dalla dashboard Supabase (tabella `posts`):
   blog ma non sulla mappa.
 - Immagini nel bucket `post-images`: massimo 10 MB, solo JPEG, PNG, WebP, AVIF.
 
-## Pagine e aggiornamento automatico
+## Pagine, lingue e aggiornamento automatico
 
-Ogni articolo ha un URL proprio (`/articoli/<slug>`); ci sono anche `/chi-siamo`,
-`/privacy` e `/mappa`. Dopo `vite build`, `scripts/prerender.mjs` legge i post
-pubblicati da Supabase e genera un file HTML per pagina con titolo, descrizione,
-anteprima social (Open Graph), dati strutturati e testo dell'articolo, piu'
-`sitemap.xml`. Se Supabase non risponde la build fallisce e resta online il
+Il sito e' in 5 lingue. L'italiano non ha prefisso, le altre si': `/` e `/en`,
+`/fr`, `/es`, `/de`. Ogni articolo ha un URL per lingua (`/articoli/<slug>`,
+`/en/articoli/<slug>`...) con lo stesso slug; ci sono anche `chi-siamo`,
+`privacy` e `mappa` per ogni lingua. Un articolo ha la versione in una lingua
+solo se in quella lingua ha almeno titolo e testo (o estratto).
+
+- Testi dell'interfaccia: `src/locales/<lingua>.js` (stesse chiavi in tutti i file).
+- Indirizzo del sito, nome, email e lingue: `src/config.js` (unico punto da
+  cambiare per un dominio personalizzato).
+
+Dopo `vite build`, `scripts/prerender.mjs` legge i post pubblicati da Supabase
+e genera un file HTML per pagina e lingua con titolo, descrizione, link
+`hreflang` alle altre lingue, anteprima social (Open Graph), dati strutturati
+e testo dell'articolo, piu' `sitemap.xml` (con le alternative per lingua) e
+`robots.txt`. Se Supabase non risponde la build fallisce e resta online il
 deploy precedente.
 
 Quando un post pubblicato cambia (o ne viene pubblicato uno nuovo), un trigger
@@ -70,6 +80,15 @@ Row Level Security di Supabase. Stato verificato il 2026-11-06:
 - scrittura su tabelle e bucket solo per l'utente amministratore;
 - registrazioni pubbliche disattivate; chiavi JWT legacy disattivate;
 - header di sicurezza (CSP e altri) in `vercel.json`.
+
+## Accessibilita'
+
+Obiettivo WCAG 2.1 AA, verificato con axe-core su home, articolo, Chi siamo,
+Privacy e Mappa in tema chiaro e scuro (0 violazioni al 2026-11-06):
+link e bottoni veri (navigabili da tastiera), "Vai al contenuto", menu mobile
+`inert` quando chiuso, finestra dell'articolo con focus gestito ed Esc,
+carosello che si ferma al focus e con "riduci movimento", contrasti AA,
+attributo `lang` della pagina aggiornato con la lingua.
 
 Dettagli, migrazioni applicate e istruzioni di ripristino in
 [`docs/supabase-rls.sql`](docs/supabase-rls.sql).
