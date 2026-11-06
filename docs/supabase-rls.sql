@@ -29,7 +29,11 @@
 --   * Registrazioni pubbliche disattivate.
 --   * Chiavi JWT legacy disattivate (anon verificata disabled); il sito usa la
 --     publishable key (sb_publishable_...).
---   * DA FARE: "Leaked password protection" e' disattivata (advisor WARN):
+--   * "Leaked password protection" disattivata (advisor WARN): secondo la doc
+--     ufficiale e' disponibile solo dal piano Pro, il progetto e' sul piano free.
+--     Rischio accettato: registrazioni chiuse, un solo utente (l'admin) e il sito
+--     non ha una pagina di login. Mitigazione: password admin lunga, casuale e
+--     non riutilizzata, e requisiti minimi di password in Auth > Providers > Email.
 --     https://supabase.com/docs/guides/auth/password-security
 --
 -- ───────────── MIGRAZIONI APPLICATE ─────────────
