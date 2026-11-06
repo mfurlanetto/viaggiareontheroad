@@ -828,12 +828,17 @@ export default function TravelBlog({ onMap }) {
   const [selectedPost,    setSelectedPost]   = useState(null);
   const [menuOpen,        setMenuOpen]       = useState(false);
   const [page,            setPage]           = useState("blog"); // "blog" | "about" | "privacy"
-  const [currentPage,     setCurrentPage]    = useState(1);
+  // La pagina corrente e' legata ai filtri con cui e' stata scelta: se i filtri
+  // cambiano, la pagina torna a 1 senza bisogno di un effect.
+  const [pageState,       setPageState]      = useState({ key: "all|all", page: 1 });
 
-  // gallery images for open post
-  const [postImages,    setPostImages]   = useState([]);
+  // gallery images for open post (tagged with the post they belong to)
+  const [galleryData,   setGalleryData]  = useState({ postId: null, images: [] });
   const [galleryIdx,    setGalleryIdx]   = useState(0);
   const [galleryOpen,   setGalleryOpen]  = useState(false);
+  const postImages = selectedPost && galleryData.postId === selectedPost.id
+    ? galleryData.images
+    : [];
 
   // carousel
   const [carouselIdx, setCarouselIdx] = useState(0);
@@ -859,15 +864,19 @@ export default function TravelBlog({ onMap }) {
 
   // fetch gallery images when a post is opened
   useEffect(() => {
-    if (!selectedPost) { setPostImages([]); setGalleryIdx(0); setGalleryOpen(false); return; }
+    if (!selectedPost) return;
+    let cancelled = false; // ignora risposte di un post gia' chiuso o sostituito
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("post_images")
         .select("*")
         .eq("post_id", selectedPost.id)
         .order("position", { ascending: true });
-      setPostImages(data || []);
+      if (!cancelled) {
+        setGalleryData({ postId: selectedPost.id, images: error ? [] : (data || []) });
+      }
     })();
+    return () => { cancelled = true; };
   }, [selectedPost]);
 
   // lock body scroll when modal or drawer is open
@@ -894,8 +903,9 @@ export default function TravelBlog({ onMap }) {
     return new Date(y, (m || 1) - 1).toLocaleDateString(lang, { month: "long", year: "numeric" });
   };
 
-  // Reset pagination when filters change
-  useEffect(() => { setCurrentPage(1); }, [activeContinent, activeCategory]);
+  // Pagina corrente: vale solo se scelta con i filtri attuali, altrimenti 1
+  const filterKey   = `${activeContinent}|${activeCategory}`;
+  const currentPage = pageState.key === filterKey ? pageState.page : 1;
 
   // ── navigation ──
   // Single source of truth: always call navigate() to change page.
@@ -903,6 +913,7 @@ export default function TravelBlog({ onMap }) {
     setPage(target);
     setMenuOpen(false);
     setSelectedPost(null);
+    setGalleryOpen(false);
     if (target === "blog") {
       setActiveContinent("all");
       setActiveCategory("all");
@@ -932,7 +943,7 @@ export default function TravelBlog({ onMap }) {
   const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const goToPage = (p) => {
-    setCurrentPage(p);
+    setPageState({ key: filterKey, page: p });
     // Scroll to top of grid on mobile, smooth on desktop
     if (gridRef.current) {
       gridRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -950,7 +961,6 @@ export default function TravelBlog({ onMap }) {
 
   useEffect(() => {
     if (paused || carouselPosts.length < 2) return;
-    setProgress(0);
     const start = Date.now();
     progressRef.current = setInterval(() => {
       const elapsed = Date.now() - start;
@@ -1072,7 +1082,7 @@ export default function TravelBlog({ onMap }) {
                   <div
                     className="carousel"
                     onMouseEnter={() => setPaused(true)}
-                    onMouseLeave={() => setPaused(false)}
+                    onMouseLeave={() => { setProgress(0); setPaused(false); }}
                     onTouchStart={onTouchStart}
                     onTouchEnd={onTouchEnd}
                   >
