@@ -25,25 +25,42 @@ Su Vercel sono impostate per Production, Preview e Development; essendo variabil
 serve un nuovo deploy (non un "Redeploy" di un deploy esistente, che riusa le
 variabili di allora).
 
-## Contenuti
+## Contenuti: pagina /admin
 
-I post si gestiscono dalla dashboard Supabase (tabella `posts`):
+Articoli, giorni e foto si gestiscono da `https://viaggiareontheroad.vercel.app/admin`
+(accesso con l'account amministratore di Supabase; le registrazioni sono chiuse).
 
-- `published` e' `false` di default: un post nuovo resta bozza finche' non lo
-  imposti a `true`.
-- `slug`: indirizzo dell'articolo (`/articoli/<slug>`). Se lo lasci vuoto viene
-  generato dal titolo italiano. **Non cambiarlo dopo la pubblicazione**: i link
-  gia' condivisi smetterebbero di funzionare.
-- `lat` / `lng`: coordinate per la mappa. Senza coordinate il post compare nel
-  blog ma non sulla mappa.
-- Immagini nel bucket `post-images`: massimo 10 MB, solo JPEG, PNG, WebP, AVIF.
+- **Articolo**: titoli e testi in italiano e inglese, continente, categoria, mese,
+  posizione sulla mappa (clic sulla mappa), copertina, "in evidenza", "pubblicato".
+  Un articolo nuovo e' una bozza finche' non spunti "Pubblicato".
+- **Giorni**: data, luogo, posizione (per il percorso sulla mappa), titolo e testo
+  it/en; si riordinano con le frecce. Eliminando un giorno le sue foto passano
+  nella galleria generale.
+- **Foto**: si trascinano o si scelgono piu' file insieme. Il browser le riduce a
+  1600 px (piu' una miniatura da 600 px), le converte in WebP e rimuove i
+  metadati EXIF, compresa la posizione GPS. Per ogni foto: didascalia e testo
+  alternativo it/en, ordine, copertina del giorno, eliminazione (anche del file).
+  Le foto HEIC si caricano da Safari; dagli altri browser vanno prima esportate
+  in JPEG.
+- **Slug**: generato dal titolo italiano; non si cambia dopo la pubblicazione,
+  per non rompere i link gia' condivisi.
+
+Dopo un salvataggio su un articolo pubblicato il sito si ricostruisce da solo in
+circa 2 minuti; le modifiche alle bozze non fanno partire deploy.
+
+L'area admin non viene indicizzata (meta robots, header `X-Robots-Tag`,
+`robots.txt`) ed e' un pacchetto JavaScript separato che i visitatori non
+scaricano. La sessione di accesso dell'amministratore e' salvata nel
+localStorage del suo browser.
 
 ## Pagine, lingue e aggiornamento automatico
 
-Il sito e' in 5 lingue. L'italiano non ha prefisso, le altre si': `/` e `/en`,
-`/fr`, `/es`, `/de`. Ogni articolo ha un URL per lingua (`/articoli/<slug>`,
-`/en/articoli/<slug>`...) con lo stesso slug; ci sono anche `chi-siamo`,
-`privacy` e `mappa` per ogni lingua. Un articolo ha la versione in una lingua
+Il sito e' in italiano (senza prefisso) e inglese (`/en`). Ogni articolo ha un
+URL per lingua (`/articoli/<slug>`, `/en/articoli/<slug>`) con lo stesso slug;
+ci sono anche `chi-siamo`, `privacy` e `mappa` per ogni lingua. I vecchi
+indirizzi `/fr`, `/es`, `/de` reindirizzano (308) alla pagina italiana; le
+colonne `*_fr`, `*_es`, `*_de` restano nel database ma non vengono usate.
+Ogni giorno di un viaggio ha un link diretto: `/articoli/<slug>#giorno-3`. Un articolo ha la versione in una lingua
 solo se in quella lingua ha almeno titolo e testo (o estratto).
 
 - Testi dell'interfaccia: `src/locales/<lingua>.js` (stesse chiavi in tutti i file).
