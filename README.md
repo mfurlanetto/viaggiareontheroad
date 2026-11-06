@@ -1,16 +1,31 @@
-# React + Vite
+# viaggiare·ontheroad
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Blog di viaggio: React 19 + Vite 7, contenuti su Supabase, mappa con Leaflet, 5 lingue (it, en, fr, es, de).
 
-Currently, two official plugins are available:
+## Avvio
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+```bash
+npm install
+cp .env.example .env   # poi compila i valori
+npm run dev
+```
 
-## React Compiler
+Script: `npm run dev`, `npm run build`, `npm run preview`, `npm run lint`.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Variabili d'ambiente
 
-## Expanding the ESLint configuration
+| Variabile | Descrizione |
+|---|---|
+| `VITE_SUPABASE_URL` | URL del progetto Supabase |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | Chiave pubblica (publishable key) |
+| `VITE_SUPABASE_ANON_KEY` | Vecchia chiave anon, accettata come alternativa |
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+Senza queste variabili l'app mostra un messaggio di configurazione mancante.
+
+## Sicurezza dei dati
+
+La chiave pubblica e' visibile nel bundle del sito: i dati sono protetti solo dalla
+Row Level Security di Supabase. Le policy proposte per `posts` e `post_images` sono in
+[`docs/supabase-rls.sql`](docs/supabase-rls.sql) (da rivedere prima dell'esecuzione).
+Il progetto Supabase free va in pausa dopo un periodo di inattivita': se il sito
+non carica i post, controlla lo stato del progetto dalla dashboard.

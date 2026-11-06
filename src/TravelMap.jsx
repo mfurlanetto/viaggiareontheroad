@@ -2,8 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
 import L from "leaflet";
+import "leaflet/dist/leaflet.css";
+import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
+import markerIcon   from "leaflet/dist/images/marker-icon.png";
+import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import "./i18n";
-import { supabase } from "./supabaseClient";
+import { fetchPublishedPosts } from "./postsApi";
+import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
 
 // ─────────────────────────────────────────────
@@ -36,24 +41,13 @@ const LANGUAGES = [
 ];
 const LANG_KEYS = ["it", "en", "fr", "es", "de"];
 
-// Fix Leaflet default icon
+// Fix Leaflet default icon (icone servite dal nostro stesso dominio, non da una CDN)
 delete L.Icon.Default.prototype._getIconUrl;
 L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png",
-  iconUrl:       "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png",
-  shadowUrl:     "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png",
+  iconRetinaUrl: markerIcon2x,
+  iconUrl:       markerIcon,
+  shadowUrl:     markerShadow,
 });
-
-// Inject assets once at module load
-const _font = document.createElement("link");
-_font.rel  = "stylesheet";
-_font.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap";
-if (!document.querySelector('link[href*="Playfair"]')) document.head.appendChild(_font);
-
-const _leaflet = document.createElement("link");
-_leaflet.rel  = "stylesheet";
-_leaflet.href = "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css";
-if (!document.querySelector('link[href*="leaflet"]')) document.head.appendChild(_leaflet);
 
 // ─────────────────────────────────────────────
 // CSS — identical token names + same font as TravelBlog
@@ -483,14 +477,13 @@ export default function TravelMap({ onBack }) {
   const [flyTarget,      setFlyTarget]     = useState(null);
   const [activeCategory, setActiveCategory]= useState(null);
   const [menuOpen,       setMenuOpen]      = useState(false);
+  // articolo aperto con testo completo (caricato solo all'apertura)
+  const openPost = usePostBody(selectedPost);
 
   // fetch
   useEffect(() => {
     (async () => {
-      const { data } = await supabase
-        .from("posts").select("*")
-        .eq("published", true)
-        .order("created_at", { ascending: false });
+      const { data } = await fetchPublishedPosts();
       setPosts(data || []);
       setLoading(false);
     })();
@@ -759,7 +752,8 @@ export default function TravelMap({ onBack }) {
         </div>
 
         {/* ── ARTICLE MODAL ── */}
-        {selectedPost && (() => {
+        {openPost && (() => {
+          const selectedPost = openPost; // con il testo completo, se gia' caricato
           const tr    = getT(selectedPost);
           const color = CATEGORY_COLORS[selectedPost.category] || "#c9a84c";
           return (

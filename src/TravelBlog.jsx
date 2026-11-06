@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import "./i18n";
 import { supabase } from "./supabaseClient";
+import { fetchPublishedPosts } from "./postsApi";
+import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
 
 // ─────────────────────────────────────────────
@@ -16,12 +18,6 @@ const LANGUAGES = [
 ];
 const LANG_KEYS      = ["it", "en", "fr", "es", "de"];
 const CAROUSEL_INTERVAL = 4500;
-
-// Inject fonts once at module load
-const _font = document.createElement("link");
-_font.rel  = "stylesheet";
-_font.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap";
-if (!document.querySelector('link[href*="Playfair"]')) document.head.appendChild(_font);
 
 // ─────────────────────────────────────────────
 // STATIC PAGE COMPONENTS (outside TravelBlog)
@@ -102,12 +98,13 @@ function AboutPage({ onBack, posts }) {
   );
 }
 
+// BOZZA da far rivedere (anche da un legale) prima della pubblicazione.
 function PrivacyPage({ onBack }) {
   return (
     <div className="privacy-wrap">
       <button className="back-btn" onClick={onBack}>← Torna al blog</button>
       <h1>Privacy Policy</h1>
-      <p className="updated">Ultimo aggiornamento: marzo 2025</p>
+      <p className="updated">Ultimo aggiornamento: novembre 2026</p>
 
       <h2>1. Titolare del trattamento</h2>
       <p>Il blog <strong>viaggiare·ontheroad</strong> è gestito a titolo personale.
@@ -115,21 +112,44 @@ function PrivacyPage({ onBack }) {
 
       <h2>2. Dati raccolti</h2>
       <p>Questo sito non raccoglie dati personali tramite form o registrazione.
-        I contenuti sono ospitati su <strong>Supabase</strong> (USA), che raccoglie
-        dati tecnici di accesso (IP, timestamp) per sicurezza e monitoraggio.</p>
+        Come ogni sito web, però, il tuo browser invia automaticamente il tuo
+        indirizzo IP e dati tecnici di connessione ai server che forniscono le
+        pagine e le risorse elencate qui sotto. Questi dati servono a erogare il
+        sito e a garantirne la sicurezza (interesse legittimo, art. 6.1.f GDPR).</p>
 
-      <h2>3. Cookie</h2>
-      <p>Il sito usa esclusivamente <strong>localStorage</strong> per salvare
-        la preferenza di lingua e tema. Nessun dato viene inviato a server esterni.
-        Non vengono usati cookie di tracciamento, pubblicitari o di terze parti.</p>
+      <h2>3. Servizi e fornitori coinvolti</h2>
+      <ul>
+        <li><strong>Vercel</strong> (USA): hosting del sito. Registra log tecnici
+          delle richieste, compreso l'indirizzo IP.</li>
+        <li><strong>Supabase</strong>: database dei contenuti, con progetto
+          ospitato in Irlanda (UE). Registra dati tecnici di accesso (IP,
+          orario) per sicurezza e monitoraggio.</li>
+        <li><strong>OpenStreetMap</strong> (OpenStreetMap Foundation, Regno Unito):
+          mappe mostrate nella pagina «Mappa». Aprendola, il tuo browser richiede
+          le mappe direttamente ai server di OpenStreetMap, che ricevono il tuo
+          indirizzo IP.</li>
+        <li><strong>Unsplash</strong> (USA): alcune immagini, ad esempio quella
+          della pagina «Chi siamo», sono caricate da images.unsplash.com, che
+          riceve il tuo indirizzo IP.</li>
+      </ul>
+      <p>Font e icone delle mappe sono invece serviti direttamente da questo sito,
+        senza chiamate a servizi esterni. Dove i dati sono trattati fuori dallo
+        Spazio economico europeo, il trasferimento avviene con le garanzie
+        previste dal Capo V del GDPR.</p>
 
-      <h2>4. Hosting</h2>
-      <p>Il sito è ospitato su <strong>Vercel</strong> (USA), che raccoglie log
-        tecnici anonimi per garantire il funzionamento del servizio.</p>
+      <h2>4. Cookie e archiviazione locale</h2>
+      <p>Il sito non usa cookie di tracciamento, pubblicitari o di terze parti.
+        Usa esclusivamente il <strong>localStorage</strong> del browser per
+        ricordare la tua preferenza di tema (chiaro o scuro). Questo valore resta
+        sul tuo dispositivo e non viene inviato a nessun server.</p>
 
       <h2>5. Diritti (GDPR)</h2>
       <p>Ai sensi del Reg. UE 2016/679 hai diritto di accesso, rettifica,
-        cancellazione e opposizione. Scrivi a <a href="mailto:ciao@viaggilontani.it">ciao@viaggilontani.it</a>.</p>
+        cancellazione, limitazione e opposizione, e di proporre reclamo
+        all'autorità di controllo (in Italia, il Garante per la protezione dei
+        dati personali, <a href="https://www.garanteprivacy.it">garanteprivacy.it</a>).
+        Per esercitare i tuoi diritti scrivi a{" "}
+        <a href="mailto:ciao@viaggilontani.it">ciao@viaggilontani.it</a>.</p>
 
       <h2>6. Modifiche</h2>
       <p>Questa policy può essere aggiornata. Le modifiche saranno visibili
@@ -415,10 +435,12 @@ const STYLES = `
   }
   .carousel-dot.active { background: var(--gold-btn); width: 24px; border-radius: 4px; }
   .carousel-progress {
-    position: absolute; bottom: 0; left: 0; height: 3px;
+    position: absolute; bottom: 0; left: 0; height: 3px; width: 100%;
     background: var(--gold-btn); z-index: 10; opacity: 0.75;
-    transition: width linear;
+    transform-origin: left; transform: scaleX(0);
+    animation: carouselProgress linear forwards;
   }
+  @keyframes carouselProgress { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
   /* ── SECTION DIVIDER ── */
   .section-divider {
@@ -828,18 +850,23 @@ export default function TravelBlog({ onMap }) {
   const [selectedPost,    setSelectedPost]   = useState(null);
   const [menuOpen,        setMenuOpen]       = useState(false);
   const [page,            setPage]           = useState("blog"); // "blog" | "about" | "privacy"
-  const [currentPage,     setCurrentPage]    = useState(1);
+  // La pagina corrente e' legata ai filtri con cui e' stata scelta: se i filtri
+  // cambiano, la pagina torna a 1 senza bisogno di un effect.
+  const [pageState,       setPageState]      = useState({ key: "all|all", page: 1 });
 
-  // gallery images for open post
-  const [postImages,    setPostImages]   = useState([]);
+  // gallery images for open post (tagged with the post they belong to)
+  const [galleryData,   setGalleryData]  = useState({ postId: null, images: [] });
   const [galleryIdx,    setGalleryIdx]   = useState(0);
   const [galleryOpen,   setGalleryOpen]  = useState(false);
+  const postImages = selectedPost && galleryData.postId === selectedPost.id
+    ? galleryData.images
+    : [];
+  // articolo aperto con testo completo (caricato solo all'apertura)
+  const openPost = usePostBody(selectedPost);
 
   // carousel
   const [carouselIdx, setCarouselIdx] = useState(0);
   const [paused,      setPaused]      = useState(false);
-  const [progress,    setProgress]    = useState(0);
-  const progressRef = useRef(null);
   const touchStartX = useRef(null);
   const gridRef     = useRef(null);
 
@@ -847,10 +874,7 @@ export default function TravelBlog({ onMap }) {
   useEffect(() => {
     (async () => {
       setLoading(true); setError(null);
-      const { data, error } = await supabase
-        .from("posts").select("*")
-        .eq("published", true)
-        .order("created_at", { ascending: false });
+      const { data, error } = await fetchPublishedPosts();
       if (error) setError(error.message);
       else setPosts(data || []);
       setLoading(false);
@@ -859,15 +883,19 @@ export default function TravelBlog({ onMap }) {
 
   // fetch gallery images when a post is opened
   useEffect(() => {
-    if (!selectedPost) { setPostImages([]); setGalleryIdx(0); setGalleryOpen(false); return; }
+    if (!selectedPost) return;
+    let cancelled = false; // ignora risposte di un post gia' chiuso o sostituito
     (async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("post_images")
         .select("*")
         .eq("post_id", selectedPost.id)
         .order("position", { ascending: true });
-      setPostImages(data || []);
+      if (!cancelled) {
+        setGalleryData({ postId: selectedPost.id, images: error ? [] : (data || []) });
+      }
     })();
+    return () => { cancelled = true; };
   }, [selectedPost]);
 
   // lock body scroll when modal or drawer is open
@@ -894,8 +922,9 @@ export default function TravelBlog({ onMap }) {
     return new Date(y, (m || 1) - 1).toLocaleDateString(lang, { month: "long", year: "numeric" });
   };
 
-  // Reset pagination when filters change
-  useEffect(() => { setCurrentPage(1); }, [activeContinent, activeCategory]);
+  // Pagina corrente: vale solo se scelta con i filtri attuali, altrimenti 1
+  const filterKey   = `${activeContinent}|${activeCategory}`;
+  const currentPage = pageState.key === filterKey ? pageState.page : 1;
 
   // ── navigation ──
   // Single source of truth: always call navigate() to change page.
@@ -903,6 +932,7 @@ export default function TravelBlog({ onMap }) {
     setPage(target);
     setMenuOpen(false);
     setSelectedPost(null);
+    setGalleryOpen(false);
     if (target === "blog") {
       setActiveContinent("all");
       setActiveCategory("all");
@@ -932,7 +962,7 @@ export default function TravelBlog({ onMap }) {
   const paginated   = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
 
   const goToPage = (p) => {
-    setCurrentPage(p);
+    setPageState({ key: filterKey, page: p });
     // Scroll to top of grid on mobile, smooth on desktop
     if (gridRef.current) {
       gridRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -942,23 +972,13 @@ export default function TravelBlog({ onMap }) {
   // ── carousel logic ──
   const goTo = useCallback((idx) => {
     setCarouselIdx((idx + carouselPosts.length) % carouselPosts.length);
-    setProgress(0);
   }, [carouselPosts.length]);
 
   const next = useCallback(() => goTo(carouselIdx + 1), [carouselIdx, goTo]);
   const prev = useCallback(() => goTo(carouselIdx - 1), [carouselIdx, goTo]);
 
-  useEffect(() => {
-    if (paused || carouselPosts.length < 2) return;
-    setProgress(0);
-    const start = Date.now();
-    progressRef.current = setInterval(() => {
-      const elapsed = Date.now() - start;
-      setProgress(Math.min((elapsed / CAROUSEL_INTERVAL) * 100, 100));
-      if (elapsed >= CAROUSEL_INTERVAL) next();
-    }, 30);
-    return () => clearInterval(progressRef.current);
-  }, [carouselIdx, paused, next, carouselPosts.length]);
+  // L'avanzamento automatico e' guidato dall'animazione CSS della barra di
+  // progresso (onAnimationEnd): nessun timer JS e nessun re-render a 30 ms.
 
   const onTouchStart = (e) => { touchStartX.current = e.touches[0].clientX; };
   const onTouchEnd   = (e) => {
@@ -1113,8 +1133,14 @@ export default function TravelBlog({ onMap }) {
                       ))}
                     </div>
 
-                    {!paused && (
-                      <div className="carousel-progress" style={{ width: `${progress}%`, transitionDuration: "30ms" }} />
+                    {/* key = slide corrente: a ogni cambio l'animazione riparte da zero */}
+                    {!paused && carouselPosts.length > 1 && (
+                      <div
+                        key={carouselIdx}
+                        className="carousel-progress"
+                        style={{ animationDuration: `${CAROUSEL_INTERVAL}ms` }}
+                        onAnimationEnd={next}
+                      />
                     )}
                   </div>
                 </div>
@@ -1253,7 +1279,8 @@ export default function TravelBlog({ onMap }) {
         </footer>
 
         {/* ── ARTICLE MODAL ── */}
-        {selectedPost && (() => {
+        {openPost && (() => {
+          const selectedPost = openPost; // con il testo completo, se gia' caricato
           const tr = getT(selectedPost);
           return (
             <div className="modal-overlay" onClick={() => setSelectedPost(null)}>
