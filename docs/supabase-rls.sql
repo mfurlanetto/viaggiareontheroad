@@ -87,6 +87,8 @@ alter table public.posts add constraint posts_lng_range check (lng is null or ln
 --    ha piu' di 45 s, chiama via net.http_post l'URL salvato nel Vault come
 --    'vercel_deploy_hook' (deve iniziare con https://api.vercel.com/).
 --    Senza segreto il job non fa nulla e lo annota in private.site_rebuild.note.
+--    site_rebuild_hook_timeout: timeout della chiamata portato a 30 s (il Deploy
+--    Hook risponde in piu' dei 5 s di default; la richiesta arrivava comunque).
 
 -- ───────────── VERIFICHE (SQL editor) ─────────────
 --   set role anon;
