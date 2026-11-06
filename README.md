@@ -25,7 +25,9 @@ Senza queste variabili l'app mostra un messaggio di configurazione mancante.
 ## Sicurezza dei dati
 
 La chiave pubblica e' visibile nel bundle del sito: i dati sono protetti solo dalla
-Row Level Security di Supabase. Le policy proposte per `posts` e `post_images` sono in
-[`docs/supabase-rls.sql`](docs/supabase-rls.sql) (da rivedere prima dell'esecuzione).
+Row Level Security di Supabase. Stato verificato il 2026-11-06: RLS attiva, lettura
+limitata ai post pubblicati; la scrittura e' invece aperta a qualsiasi utente
+autenticato, quindi conviene disattivare le registrazioni pubbliche. Dettagli e
+proposte di hardening (non applicate) in [`docs/supabase-rls.sql`](docs/supabase-rls.sql).
 Il progetto Supabase free va in pausa dopo un periodo di inattivita': se il sito
 non carica i post, controlla lo stato del progetto dalla dashboard.
