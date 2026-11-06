@@ -19,12 +19,6 @@ const LANGUAGES = [
 const LANG_KEYS      = ["it", "en", "fr", "es", "de"];
 const CAROUSEL_INTERVAL = 4500;
 
-// Inject fonts once at module load
-const _font = document.createElement("link");
-_font.rel  = "stylesheet";
-_font.href = "https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&family=Lato:wght@300;400;700&display=swap";
-if (!document.querySelector('link[href*="Playfair"]')) document.head.appendChild(_font);
-
 // ─────────────────────────────────────────────
 // STATIC PAGE COMPONENTS (outside TravelBlog)
 // These never re-mount because their identity is stable.
@@ -104,12 +98,13 @@ function AboutPage({ onBack, posts }) {
   );
 }
 
+// BOZZA da far rivedere (anche da un legale) prima della pubblicazione.
 function PrivacyPage({ onBack }) {
   return (
     <div className="privacy-wrap">
       <button className="back-btn" onClick={onBack}>← Torna al blog</button>
       <h1>Privacy Policy</h1>
-      <p className="updated">Ultimo aggiornamento: marzo 2025</p>
+      <p className="updated">Ultimo aggiornamento: novembre 2026</p>
 
       <h2>1. Titolare del trattamento</h2>
       <p>Il blog <strong>viaggiare·ontheroad</strong> è gestito a titolo personale.
@@ -117,21 +112,44 @@ function PrivacyPage({ onBack }) {
 
       <h2>2. Dati raccolti</h2>
       <p>Questo sito non raccoglie dati personali tramite form o registrazione.
-        I contenuti sono ospitati su <strong>Supabase</strong> (USA), che raccoglie
-        dati tecnici di accesso (IP, timestamp) per sicurezza e monitoraggio.</p>
+        Come ogni sito web, però, il tuo browser invia automaticamente il tuo
+        indirizzo IP e dati tecnici di connessione ai server che forniscono le
+        pagine e le risorse elencate qui sotto. Questi dati servono a erogare il
+        sito e a garantirne la sicurezza (interesse legittimo, art. 6.1.f GDPR).</p>
 
-      <h2>3. Cookie</h2>
-      <p>Il sito usa esclusivamente <strong>localStorage</strong> per salvare
-        la preferenza di lingua e tema. Nessun dato viene inviato a server esterni.
-        Non vengono usati cookie di tracciamento, pubblicitari o di terze parti.</p>
+      <h2>3. Servizi e fornitori coinvolti</h2>
+      <ul>
+        <li><strong>Vercel</strong> (USA): hosting del sito. Registra log tecnici
+          delle richieste, compreso l'indirizzo IP.</li>
+        <li><strong>Supabase</strong>: database dei contenuti, con progetto
+          ospitato in Irlanda (UE). Registra dati tecnici di accesso (IP,
+          orario) per sicurezza e monitoraggio.</li>
+        <li><strong>OpenStreetMap</strong> (OpenStreetMap Foundation, Regno Unito):
+          mappe mostrate nella pagina «Mappa». Aprendola, il tuo browser richiede
+          le mappe direttamente ai server di OpenStreetMap, che ricevono il tuo
+          indirizzo IP.</li>
+        <li><strong>Unsplash</strong> (USA): alcune immagini, ad esempio quella
+          della pagina «Chi siamo», sono caricate da images.unsplash.com, che
+          riceve il tuo indirizzo IP.</li>
+      </ul>
+      <p>Font e icone delle mappe sono invece serviti direttamente da questo sito,
+        senza chiamate a servizi esterni. Dove i dati sono trattati fuori dallo
+        Spazio economico europeo, il trasferimento avviene con le garanzie
+        previste dal Capo V del GDPR.</p>
 
-      <h2>4. Hosting</h2>
-      <p>Il sito è ospitato su <strong>Vercel</strong> (USA), che raccoglie log
-        tecnici anonimi per garantire il funzionamento del servizio.</p>
+      <h2>4. Cookie e archiviazione locale</h2>
+      <p>Il sito non usa cookie di tracciamento, pubblicitari o di terze parti.
+        Usa esclusivamente il <strong>localStorage</strong> del browser per
+        ricordare la tua preferenza di tema (chiaro o scuro). Questo valore resta
+        sul tuo dispositivo e non viene inviato a nessun server.</p>
 
       <h2>5. Diritti (GDPR)</h2>
       <p>Ai sensi del Reg. UE 2016/679 hai diritto di accesso, rettifica,
-        cancellazione e opposizione. Scrivi a <a href="mailto:ciao@viaggilontani.it">ciao@viaggilontani.it</a>.</p>
+        cancellazione, limitazione e opposizione, e di proporre reclamo
+        all'autorità di controllo (in Italia, il Garante per la protezione dei
+        dati personali, <a href="https://www.garanteprivacy.it">garanteprivacy.it</a>).
+        Per esercitare i tuoi diritti scrivi a{" "}
+        <a href="mailto:ciao@viaggilontani.it">ciao@viaggilontani.it</a>.</p>
 
       <h2>6. Modifiche</h2>
       <p>Questa policy può essere aggiornata. Le modifiche saranno visibili
