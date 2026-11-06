@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://viaggiareontheroad.vercel.app/sitemap.xml

@@ -10,6 +10,7 @@ import "./i18n";
 import { fetchPublishedPosts } from "./postsApi";
 import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
+import { responsiveImage, IMG } from "./images";
 
 // ─────────────────────────────────────────────
 // CONSTANTS — module scope, never recreated
@@ -697,7 +698,7 @@ export default function TravelMap({ onBack }) {
                           {tr.destination} · {categoryLabels[post.category]}
                         </div>
                         {post.image_url && (
-                          <img className="map-popup-img" src={post.image_url} alt={tr.title} />
+                          <img className="map-popup-img" {...responsiveImage(post.image_url, ...IMG.popup)} alt={tr.title} width="210" height="100" decoding="async" />
                         )}
                         <div className="map-popup-title">{tr.title}</div>
                         <div className="map-popup-dest">{tr.subtitle}</div>
@@ -730,7 +731,7 @@ export default function TravelMap({ onBack }) {
                   onClick={() => setFlyTarget(getCoords(post))}
                 >
                   {post.image_url && (
-                    <img className="side-card-img" src={post.image_url} alt={tr.title} />
+                    <img className="side-card-img" {...responsiveImage(post.image_url, ...IMG.thumb)} alt={tr.title} width="62" height="46" loading="lazy" decoding="async" />
                   )}
                   <div className="side-card-body">
                     <div className="side-card-cat" style={{ color }}>
@@ -757,7 +758,7 @@ export default function TravelMap({ onBack }) {
             <div className="modal-overlay" onClick={() => setSelectedPost(null)}>
               <div className="modal" onClick={e => e.stopPropagation()}>
                 {selectedPost.image_url && (
-                  <img className="modal-hero-img" src={selectedPost.image_url} alt={tr.title} />
+                  <img className="modal-hero-img" {...responsiveImage(selectedPost.image_url, ...IMG.modal)} alt={tr.title} width="720" height="300" decoding="async" />
                 )}
                 <div className="modal-body">
                   <div className="modal-cat" style={{ color }}>

@@ -5,6 +5,7 @@ import { supabase } from "./supabaseClient";
 import { fetchPublishedPosts } from "./postsApi";
 import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
+import { responsiveImage, IMG } from "./images";
 
 // ─────────────────────────────────────────────
 // CONSTANTS (module scope — never recreated)
@@ -1111,7 +1112,10 @@ export default function TravelBlog({ onMap }) {
                             className="carousel-slide"
                             onClick={() => setSelectedPost(post)}
                           >
-                            <img src={post.image_url} alt={tr.title} />
+                            <img {...responsiveImage(post.image_url, ...IMG.hero)} alt={tr.title}
+                              width="1200" height="520" decoding="async"
+                              loading={post.id === carouselPosts[0].id ? "eager" : "lazy"}
+                              fetchPriority={post.id === carouselPosts[0].id ? "high" : "auto"} />
                             <div className="hero-overlay">
                               <span className="hero-tag">{tr.destination} · {t(`categories.${post.category}`)}</span>
                               <h1 className="hero-title">{tr.title}</h1>
@@ -1184,7 +1188,8 @@ export default function TravelBlog({ onMap }) {
                   return (
                     <article key={post.id} className="card" onClick={() => setSelectedPost(post)}>
                       <div className="card-img-wrap">
-                        <img src={post.image_url} alt={tr.title} />
+                        <img {...responsiveImage(post.image_url, ...IMG.card)} alt={tr.title}
+                          width="400" height="215" loading="lazy" decoding="async" />
                       </div>
                       <div className="card-cat">{tr.destination} · {t(`categories.${post.category}`)}</div>
                       <h2 className="card-title">{tr.title}</h2>
@@ -1288,7 +1293,8 @@ export default function TravelBlog({ onMap }) {
           return (
             <div className="modal-overlay" onClick={() => setSelectedPost(null)}>
               <div className="modal" onClick={e => e.stopPropagation()}>
-                <img className="modal-hero-img" src={selectedPost.image_url} alt={tr.title} />
+                <img className="modal-hero-img" {...responsiveImage(selectedPost.image_url, ...IMG.modal)} alt={tr.title}
+                  width="720" height="300" decoding="async" />
                 <div className="modal-body">
                   <div className="modal-cat">{tr.destination} · {t(`categories.${selectedPost.category}`)}</div>
                   <h2 className="modal-title">{tr.title}</h2>
