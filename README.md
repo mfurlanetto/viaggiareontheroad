@@ -31,9 +31,35 @@ I post si gestiscono dalla dashboard Supabase (tabella `posts`):
 
 - `published` e' `false` di default: un post nuovo resta bozza finche' non lo
   imposti a `true`.
+- `slug`: indirizzo dell'articolo (`/articoli/<slug>`). Se lo lasci vuoto viene
+  generato dal titolo italiano. **Non cambiarlo dopo la pubblicazione**: i link
+  gia' condivisi smetterebbero di funzionare.
 - `lat` / `lng`: coordinate per la mappa. Senza coordinate il post compare nel
   blog ma non sulla mappa.
 - Immagini nel bucket `post-images`: massimo 10 MB, solo JPEG, PNG, WebP, AVIF.
+
+## Pagine e aggiornamento automatico
+
+Ogni articolo ha un URL proprio (`/articoli/<slug>`); ci sono anche `/chi-siamo`,
+`/privacy` e `/mappa`. Dopo `vite build`, `scripts/prerender.mjs` legge i post
+pubblicati da Supabase e genera un file HTML per pagina con titolo, descrizione,
+anteprima social (Open Graph), dati strutturati e testo dell'articolo, piu'
+`sitemap.xml`. Se Supabase non risponde la build fallisce e resta online il
+deploy precedente.
+
+Quando un post pubblicato cambia (o ne viene pubblicato uno nuovo), un trigger
+in Supabase segna il sito come da ricostruire; un job `pg_cron` ogni minuto, se
+l'ultima modifica ha piu' di 45 secondi, chiama il Deploy Hook di Vercel. Il sito
+si aggiorna in circa due minuti. L'URL del Deploy Hook e' salvato nel Vault di
+Supabase (segreto `vercel_deploy_hook`), non nel repository. Stato e ultimo
+invio: `select * from private.site_rebuild;` nel SQL editor.
+
+Configurazione (una sola volta):
+
+1. Vercel > progetto > Settings > Git > Deploy Hooks: nome `supabase`, branch
+   `master`, crea e copia l'URL.
+2. Supabase > SQL Editor:
+   `select vault.create_secret('<URL del deploy hook>', 'vercel_deploy_hook');`
 
 ## Sicurezza
 
