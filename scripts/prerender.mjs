@@ -253,7 +253,7 @@ async function write(urlPath, html) {
 
 async function main() {
   const template = await fs.readFile(path.join(DIST, "index.html"), "utf8");
-  await fs.writeFile(path.join(DIST, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`);
+  await fs.writeFile(path.join(DIST, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: /admin\n\nSitemap: ${SITE_URL}/sitemap.xml\n`);
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     console.warn("[prerender] VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY mancanti: salto il pre-render.");
     return;

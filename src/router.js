@@ -22,6 +22,8 @@ export const postKey = (post) => post.slug || String(post.id);
 
 export function parseRoute(pathname) {
   let p = pathname.replace(/\/+$/, "") || "/";
+  // Area riservata, solo in italiano e senza prefisso di lingua
+  if (p === "/admin" || p.startsWith("/admin/")) return { lang: DEFAULT_LANG, name: "admin" };
   let lang = DEFAULT_LANG;
   const m0 = p.match(/^\/([a-z]{2})(?=\/|$)/);
   if (m0 && LANGS.includes(m0[1]) && m0[1] !== DEFAULT_LANG) {
