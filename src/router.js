@@ -1,14 +1,19 @@
 import { useSyncExternalStore } from "react";
+import { LANGS, DEFAULT_LANG } from "./config";
 
-// Router minimale basato sulla History API: URL veri (/articoli/<slug>, /mappa, ...)
-// senza dipendenze esterne. Le stesse route sono pre-renderizzate alla build
-// (scripts/prerender.mjs), quindi ogni URL esiste anche come file HTML.
-export const paths = {
-  home: "/",
-  article: (slug) => `/articoli/${encodeURIComponent(slug)}`,
-  about: "/chi-siamo",
-  privacy: "/privacy",
-  map: "/mappa",
+// Router minimale basato sulla History API, senza dipendenze esterne.
+// URL: [/<lingua>]/, /articoli/<slug>, /chi-siamo, /privacy, /mappa.
+// L'italiano non ha prefisso; le altre lingue sono /en, /fr, /es, /de.
+// Le stesse route sono pre-renderizzate alla build (scripts/prerender.mjs).
+
+const prefix = (lang) => (lang === DEFAULT_LANG ? "" : `/${lang}`);
+
+export const pathFor = {
+  home: (lang) => prefix(lang) || "/",
+  article: (lang, slug) => `${prefix(lang)}/articoli/${encodeURIComponent(slug)}`,
+  about: (lang) => `${prefix(lang)}/chi-siamo`,
+  privacy: (lang) => `${prefix(lang)}/privacy`,
+  map: (lang) => `${prefix(lang)}/mappa`,
 };
 
 // Identificativo dell'articolo nell'URL: lo slug (sempre presente nel DB),
@@ -16,14 +21,31 @@ export const paths = {
 export const postKey = (post) => post.slug || String(post.id);
 
 export function parseRoute(pathname) {
-  const p = pathname.replace(/\/+$/, "") || "/";
-  if (p === "/") return { name: "home" };
-  if (p === paths.about) return { name: "about" };
-  if (p === paths.privacy) return { name: "privacy" };
-  if (p === paths.map) return { name: "map" };
+  let p = pathname.replace(/\/+$/, "") || "/";
+  let lang = DEFAULT_LANG;
+  const m0 = p.match(/^\/([a-z]{2})(?=\/|$)/);
+  if (m0 && LANGS.includes(m0[1]) && m0[1] !== DEFAULT_LANG) {
+    lang = m0[1];
+    p = p.slice(3) || "/";
+  }
+  if (p === "/") return { lang, name: "home" };
+  if (p === "/chi-siamo") return { lang, name: "about" };
+  if (p === "/privacy") return { lang, name: "privacy" };
+  if (p === "/mappa") return { lang, name: "map" };
   const m = p.match(/^\/articoli\/([^/]+)$/);
-  if (m) return { name: "article", slug: decodeURIComponent(m[1]) };
-  return { name: "notfound" };
+  if (m) return { lang, name: "article", slug: decodeURIComponent(m[1]) };
+  return { lang, name: "notfound" };
+}
+
+// URL della stessa pagina in un'altra lingua (per il selettore lingua).
+export function routeIn(route, lang) {
+  switch (route.name) {
+    case "article": return pathFor.article(lang, route.slug);
+    case "about": return pathFor.about(lang);
+    case "privacy": return pathFor.privacy(lang);
+    case "map": return pathFor.map(lang);
+    default: return pathFor.home(lang);
+  }
 }
 
 const EVENT = "app:navigate";
