@@ -1,6 +1,6 @@
 // Pre-render delle pagine dopo `vite build`, in tutte le lingue.
 //
-// Per ogni lingua (italiano senza prefisso, poi /en, /fr, /es, /de) genera:
+// Per ogni lingua (italiano senza prefisso, inglese con /en) genera:
 // - articoli/<slug>.html per ogni post pubblicato con testo in quella lingua,
 //   con title, description, canonical, hreflang, Open Graph/Twitter, JSON-LD
 //   BlogPosting e il testo dell'articolo gia' nell'HTML;
@@ -18,11 +18,8 @@ import { loadEnv } from "vite";
 import { SITE_URL, SITE_NAME, LANGS, DEFAULT_LANG, LANG_INFO } from "../src/config.js";
 import it from "../src/locales/it.js";
 import en from "../src/locales/en.js";
-import fr from "../src/locales/fr.js";
-import es from "../src/locales/es.js";
-import de from "../src/locales/de.js";
 
-const T = { it, en, fr, es, de };
+const T = { it, en };
 const DEFAULT_IMAGE = `${SITE_URL}/og-image.jpg`;
 const DIST = path.resolve("dist");
 
@@ -152,6 +149,7 @@ function articlePage(template, post, lang) {
       <h1>${esc(title)}</h1>
       ${field(post, "subtitle", lang) ? `<p><em>${esc(field(post, "subtitle", lang))}</em></p>` : ""}
       ${paragraphs(field(post, "body", lang) || field(post, "excerpt", lang))}
+      ${daysHtml(post, lang)}
     </article>`;
   return render(template, {
     lang,
@@ -159,6 +157,32 @@ function articlePage(template, post, lang) {
     body,
     extraHead: `<script type="application/ld+json">${ldJson}</script>`,
   });
+}
+
+// Giorni del viaggio nell'HTML statico: titolo, data/luogo, testo, foto con alt.
+let DAYS = [], IMAGES = [];
+function daysHtml(post, lang) {
+  const t = T[lang];
+  const pickL = (o, f) => o[`${f}_${lang}`] || o[`${f}_it`] || "";
+  const days = DAYS.filter(d => d.post_id === post.id);
+  if (!days.length) return "";
+  const toc = `<nav><h2>${esc(t.days.toc)}</h2><ol>${days.map(d =>
+    `<li><a href="#giorno-${d.day_number}">${esc(t.days.day.replace("{{n}}", d.day_number))}${pickL(d, "title") ? ` — ${esc(pickL(d, "title"))}` : ""}</a></li>`).join("")}</ol></nav>`;
+  const sections = days.map(d => {
+    const photos = IMAGES.filter(i => i.day_id === d.id);
+    const imgs = photos.map(i => {
+      const alt = i[`alt_${lang}`] || i.alt_it || i[`caption_${lang}`] || i.caption_it || "";
+      return `<img src="${esc(i.thumb_url || i.url)}" alt="${esc(alt)}" loading="lazy"${i.width ? ` width="${i.width}" height="${i.height}"` : ""} />`;
+    }).join("\n");
+    const meta = [d.date || "", pickL(d, "place")].filter(Boolean).join(" · ");
+    return `<section id="giorno-${d.day_number}">
+        <h2>${esc(t.days.day.replace("{{n}}", d.day_number))}${pickL(d, "title") ? ` — ${esc(pickL(d, "title"))}` : ""}</h2>
+        ${meta ? `<p>${esc(meta)}</p>` : ""}
+        ${paragraphs(pickL(d, "body"))}
+        ${imgs}
+      </section>`;
+  }).join("\n");
+  return toc + "\n" + sections;
 }
 
 function homeBody(posts, lang) {
@@ -177,6 +201,30 @@ function homeBody(posts, lang) {
       </ul>
       <p><a href="${route.map(lang)}">${esc(t.meta.mapTitle)}</a> · <a href="${route.about(lang)}">${esc(t.meta.aboutTitle)}</a> · <a href="${route.privacy(lang)}">${esc(t.meta.privacyTitle)}</a></p>
     </main>`;
+}
+
+async function getJson(url) {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await fetch(url, { headers: { apikey: SUPABASE_KEY, Accept: "application/json" } });
+      if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 300)}`);
+      return await res.json();
+    } catch (e) {
+      lastError = e;
+      await new Promise(r => setTimeout(r, attempt * 2000));
+    }
+  }
+  throw new Error(`Supabase non raggiungibile per il pre-render: ${lastError?.message}`);
+}
+
+// Giorni e foto dei post pubblicati (la RLS restituisce solo quelli pubblicati).
+async function fetchDaysAndImages() {
+  const [days, images] = await Promise.all([
+    getJson(`${SUPABASE_URL}/rest/v1/post_days?select=*&order=day_number.asc`),
+    getJson(`${SUPABASE_URL}/rest/v1/post_images?select=*&order=position.asc`),
+  ]);
+  return { days, images };
 }
 
 async function fetchPosts() {
@@ -205,12 +253,13 @@ async function write(urlPath, html) {
 
 async function main() {
   const template = await fs.readFile(path.join(DIST, "index.html"), "utf8");
-  await fs.writeFile(path.join(DIST, "robots.txt"), `User-agent: *\nAllow: /\n\nSitemap: ${SITE_URL}/sitemap.xml\n`);
+  await fs.writeFile(path.join(DIST, "robots.txt"), `User-agent: *\nAllow: /\nDisallow: /admin\n\nSitemap: ${SITE_URL}/sitemap.xml\n`);
   if (!SUPABASE_URL || !SUPABASE_KEY) {
     console.warn("[prerender] VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY mancanti: salto il pre-render.");
     return;
   }
   const posts = (await fetchPosts()).filter(p => p.slug);
+  ({ days: DAYS, images: IMAGES } = await fetchDaysAndImages());
   const today = new Date().toISOString().slice(0, 10);
   const sitemap = []; // { loc, lastmod, alternates }
   const allLangs = (fn) => Object.fromEntries(LANGS.map(l => [l, fn(l)]));

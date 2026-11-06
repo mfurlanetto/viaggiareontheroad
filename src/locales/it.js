@@ -1,5 +1,5 @@
 // Testi dell'interfaccia in italiano (lingua principale).
-// Le chiavi sono le stesse in tutte le lingue: vedi en.js, fr.js, es.js, de.js.
+// Le chiavi sono le stesse in tutte le lingue: vedi en.js.
 export default {
   nav: { destinations: "Destinazioni", stories: "Storie", map: "Mappa", about: "Chi siamo", menu: "Apri il menu", closeMenu: "Chiudi il menu" },
   a11y: {
@@ -34,6 +34,12 @@ export default {
     read: "di lettura",
     loadingText: "Caricamento del testo…",
     errorText: "Non è stato possibile caricare il testo dell'articolo. Riprova più tardi.",
+  },
+  days: {
+    toc: "I giorni del viaggio",
+    day: "Giorno {{n}}",
+    photos: "Foto del giorno {{n}}",
+    morePhotos: "Altre foto del viaggio",
   },
   gallery: { title: "Galleria fotografica · {{count}} foto" },
   empty: "Nessun articolo trovato.",
@@ -101,6 +107,8 @@ export default {
     readStory: "Leggi il racconto →",
     loading: "Caricamento mappa…",
     error: "Impossibile caricare i viaggi: {{msg}}",
+    route: "Percorso: {{count}} tappe",
+    stop: "Giorno {{n}}",
     showOnMap: "Mostra sulla mappa: {{title}}",
   },
   meta: {

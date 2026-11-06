@@ -90,6 +90,14 @@ alter table public.posts add constraint posts_lng_range check (lng is null or ln
 --    site_rebuild_hook_timeout: timeout della chiamata portato a 30 s (il Deploy
 --    Hook risponde in piu' dei 5 s di default; la richiesta arrivava comunque).
 
+-- 7) post_days_and_day_photos + post_days_revoke_extra_privileges
+--    Tabella post_days (giorni del viaggio: numero, data, luogo, lat/lng,
+--    titolo/testo it-en, cover_image_id), vincolo unique(post_id, day_number)
+--    DEFERRABLE. post_images: day_id (on delete set null), thumb_url, width,
+--    height, storage_path, caption/alt it-en. posts.image_thumb_url.
+--    RLS di post_days come post_images; authenticated senza TRUNCATE/REFERENCES/
+--    TRIGGER. mark_site_dirty conta giorni e foto solo dei post pubblicati.
+
 -- ───────────── VERIFICHE (SQL editor) ─────────────
 --   set role anon;
 --   select count(*) from public.posts where published = false;   -- atteso 0
@@ -100,6 +108,12 @@ alter table public.posts add constraint posts_lng_range check (lng is null or ln
 --   reset role;
 --
 -- ───────────── RIPRISTINO (solo se serve tornare indietro) ─────────────
+-- 7) drop table public.post_days cascade;
+--    alter table public.post_images drop column day_id, drop column thumb_url,
+--      drop column width, drop column height, drop column storage_path,
+--      drop column caption_it, drop column caption_en, drop column alt_it, drop column alt_en;
+--    alter table public.posts drop column image_thumb_url;
+--
 -- 6) select cron.unschedule('site-rebuild');
 --    drop trigger posts_mark_site_dirty on public.posts;
 --    drop trigger post_images_mark_site_dirty on public.post_images;
