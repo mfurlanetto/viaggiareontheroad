@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import markerIcon2x from "leaflet/dist/images/marker-icon-2x.png";
 import markerIcon   from "leaflet/dist/images/marker-icon.png";
 import markerShadow from "leaflet/dist/images/marker-shadow.png";
 import "./styles/map.css";
-import { fetchPublishedPosts } from "./postsApi";
+import { fetchPublishedPosts, fetchDayStops } from "./postsApi";
 import { useTheme } from "./useTheme";
 import { responsiveImage, IMG } from "./images";
 import { pathFor, postKey, navigateTo, linkProps } from "./router";
@@ -37,14 +37,18 @@ function createPinIcon(color) {
 }
 
 // Con "riduci movimento" la mappa si sposta senza animazione.
-function MapFlyTo({ coords }) {
+// target: { coords } per un punto, { bounds } per inquadrare un percorso.
+function MapFlyTo({ target }) {
   const map = useMap();
   useEffect(() => {
-    if (!coords) return;
+    if (!target) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduce) map.setView(coords, 5);
-    else map.flyTo(coords, 5, { duration: 1.2 });
-  }, [coords, map]);
+    if (target.bounds) {
+      const b = L.latLngBounds(target.bounds).pad(0.3);
+      if (reduce) map.fitBounds(b, { maxZoom: 8 }); else map.flyToBounds(b, { maxZoom: 8, duration: 1.2 });
+    } else if (reduce) map.setView(target.coords, 5);
+    else map.flyTo(target.coords, 5, { duration: 1.2 });
+  }, [target, map]);
   return null;
 }
 
@@ -61,15 +65,18 @@ export default function TravelMap({ route }) {
   const [posts,          setPosts]         = useState([]);
   const [loading,        setLoading]       = useState(true);
   const [flyTarget,      setFlyTarget]     = useState(null);
+  const [stops,          setStops]         = useState([]);   // tappe giornaliere di tutti i viaggi
+  const [activePostId,   setActivePostId]  = useState(null); // viaggio di cui mostrare il percorso
   const [activeCategory, setActiveCategory]= useState(null);
   const [menuOpen,       setMenuOpen]      = useState(false);
   const [error,          setError]         = useState(null);
 
   useEffect(() => {
     (async () => {
-      const { data, error } = await fetchPublishedPosts();
+      const [{ data, error }, dayStops] = await Promise.all([fetchPublishedPosts(), fetchDayStops()]);
       if (error) setError(error.message);
       else setPosts(data || []);
+      setStops(dayStops);
       setLoading(false);
     })();
   }, []);
@@ -93,6 +100,16 @@ export default function TravelMap({ route }) {
   const openArticle = (post) => navigateTo(pathFor.article(lang, postKey(post)));
 
   const postsWithCoords  = posts.filter(p => getCoords(p));
+  const stopsOf = (postId) => stops.filter(s => s.post_id === postId);
+  const pick = (o, f) => o[`${f}_${lang}`] || o[`${f}_it`] || "";
+  // Seleziona un viaggio: mostra il suo percorso (se ha tappe) e lo inquadra.
+  const selectPost = (post) => {
+    const own = stopsOf(post.id);
+    setActivePostId(post.id);
+    if (own.length > 1) setFlyTarget({ bounds: own.map(s => [s.lat, s.lng]) });
+    else setFlyTarget({ coords: own[0] ? [own[0].lat, own[0].lng] : getCoords(post) });
+  };
+  const activeStops = activePostId ? stopsOf(activePostId) : [];
   const filtered         = activeCategory ? postsWithCoords.filter(p => p.category === activeCategory) : postsWithCoords;
   const uniqueCountries  = new Set(posts.map(p => p.destination_en || p.destination_it)).size;
   const uniqueContinents = new Set(posts.map(p => p.continent)).size;
@@ -171,7 +188,20 @@ export default function TravelMap({ route }) {
                     url="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
                     attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
                   />
-                  <MapFlyTo coords={flyTarget} />
+                  <MapFlyTo target={flyTarget} />
+                  {/* Percorso del viaggio selezionato, giorno per giorno */}
+                  {activeStops.length > 1 && (
+                    <Polyline positions={activeStops.map(s => [s.lat, s.lng])}
+                      pathOptions={{ color: "#d4a843", weight: 3, dashArray: "6 8", opacity: 0.9 }} />
+                  )}
+                  {activeStops.map(s => (
+                    <CircleMarker key={`${s.post_id}-${s.day_number}`} center={[s.lat, s.lng]} radius={7}
+                      pathOptions={{ color: "#1a1a18", weight: 2, fillColor: "#d4a843", fillOpacity: 1 }}>
+                      <Tooltip direction="top">
+                        {t("map.stop", { n: s.day_number })}{pick(s, "place") ? ` · ${pick(s, "place")}` : ""}
+                      </Tooltip>
+                    </CircleMarker>
+                  ))}
                   {filtered.map(post => {
                     const coords = getCoords(post);
                     const tr     = postText(post, lang);
@@ -183,7 +213,7 @@ export default function TravelMap({ route }) {
                         icon={createPinIcon(color)}
                         title={tr.title}
                         alt={tr.title}
-                        eventHandlers={{ click: () => setFlyTarget(coords) }}
+                        eventHandlers={{ click: () => selectPost(post) }}
                       >
                         <Popup maxWidth={240} minWidth={210}>
                           <div className="map-popup">
@@ -192,11 +222,14 @@ export default function TravelMap({ route }) {
                               {tr.destination} · {t(`categories.${post.category}`)}
                             </div>
                             {post.image_url && (
-                              <img className="map-popup-img" {...responsiveImage(post.image_url, ...IMG.popup)} alt="" width="210" height="100" decoding="async" />
+                              <img className="map-popup-img" {...responsiveImage(post.image_url, ...IMG.popup, post.image_thumb_url)} alt="" width="210" height="100" decoding="async" />
                             )}
                             <div className="map-popup-title">{tr.title}</div>
                             <div className="map-popup-dest">{tr.subtitle}</div>
                             <p className="map-popup-excerpt">{tr.excerpt}</p>
+                            {stopsOf(post.id).length > 1 && (
+                              <p className="map-popup-route">{t("map.route", { count: stopsOf(post.id).length })}</p>
+                            )}
                             <a className="map-popup-btn" {...linkProps(pathFor.article(lang, postKey(post)), () => openArticle(post))}>
                               {t("map.readStory")}
                             </a>
@@ -223,10 +256,11 @@ export default function TravelMap({ route }) {
                         <button
                           className="side-card"
                           aria-label={t("map.showOnMap", { title: tr.title })}
-                          onClick={() => setFlyTarget(getCoords(post))}
+                          aria-pressed={activePostId === post.id}
+                          onClick={() => selectPost(post)}
                         >
                           {post.image_url && (
-                            <img className="side-card-img" {...responsiveImage(post.image_url, ...IMG.thumb)} alt="" width="62" height="46" loading="lazy" decoding="async" />
+                            <img className="side-card-img" {...responsiveImage(post.image_url, ...IMG.thumb, post.image_thumb_url)} alt="" width="62" height="46" loading="lazy" decoding="async" />
                           )}
                           <span className="side-card-body">
                             <span className="side-card-cat">{t(`categories.${post.category}`)}</span>

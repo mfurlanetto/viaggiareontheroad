@@ -89,6 +89,22 @@ alter table public.posts add constraint posts_lng_range check (lng is null or ln
 --    Senza segreto il job non fa nulla e lo annota in private.site_rebuild.note.
 --    site_rebuild_hook_timeout: timeout della chiamata portato a 30 s (il Deploy
 --    Hook risponde in piu' dei 5 s di default; la richiesta arrivava comunque).
+--    site_rebuild_on_demand_job (2026-11-15): il job ogni minuto consumava il
+--    budget di Disk IO del piano Nano (~7.000 scritture/giorno a vuoto). Ora il
+--    job NON esiste a riposo: mark_site_dirty lo crea (cron.schedule) alla prima
+--    modifica di un contenuto pubblicato; trigger_site_rebuild, dopo 45 s di
+--    calma, chiama il Deploy Hook e si cancella (cron.unschedule). Lo stesso se
+--    non c'e' nulla da fare o se manca il segreto.
+--    Storico vecchio (facoltativo, da SQL Editor):
+--      delete from cron.job_run_details where jobid not in (select jobid from cron.job);
+
+-- 7) post_days_and_day_photos + post_days_revoke_extra_privileges
+--    Tabella post_days (giorni del viaggio: numero, data, luogo, lat/lng,
+--    titolo/testo it-en, cover_image_id), vincolo unique(post_id, day_number)
+--    DEFERRABLE. post_images: day_id (on delete set null), thumb_url, width,
+--    height, storage_path, caption/alt it-en. posts.image_thumb_url.
+--    RLS di post_days come post_images; authenticated senza TRUNCATE/REFERENCES/
+--    TRIGGER. mark_site_dirty conta giorni e foto solo dei post pubblicati.
 
 -- ───────────── VERIFICHE (SQL editor) ─────────────
 --   set role anon;
@@ -100,7 +116,13 @@ alter table public.posts add constraint posts_lng_range check (lng is null or ln
 --   reset role;
 --
 -- ───────────── RIPRISTINO (solo se serve tornare indietro) ─────────────
--- 6) select cron.unschedule('site-rebuild');
+-- 7) drop table public.post_days cascade;
+--    alter table public.post_images drop column day_id, drop column thumb_url,
+--      drop column width, drop column height, drop column storage_path,
+--      drop column caption_it, drop column caption_en, drop column alt_it, drop column alt_en;
+--    alter table public.posts drop column image_thumb_url;
+--
+-- 6) select cron.unschedule('site-rebuild');   -- solo se in quel momento esiste
 --    drop trigger posts_mark_site_dirty on public.posts;
 --    drop trigger post_images_mark_site_dirty on public.post_images;
 --    drop schema private cascade;   -- ATTENZIONE: rimuove anche private.slugify (usata dal 5)

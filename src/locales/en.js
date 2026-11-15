@@ -34,6 +34,12 @@ export default {
     loadingText: "Loading the story…",
     errorText: "The story text could not be loaded. Please try again later.",
   },
+  days: {
+    toc: "Day by day",
+    day: "Day {{n}}",
+    photos: "Photos of day {{n}}",
+    morePhotos: "More photos from the trip",
+  },
   gallery: { title: "Photo gallery · {{count}} photos" },
   empty: "No stories found.",
   loading: "Loading stories…",
@@ -100,6 +106,8 @@ export default {
     readStory: "Read the story →",
     loading: "Loading map…",
     error: "Could not load the trips: {{msg}}",
+    route: "Route: {{count}} stops",
+    stop: "Day {{n}}",
     showOnMap: "Show on the map: {{title}}",
   },
   meta: {

@@ -1,18 +1,19 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import "./styles/blog.css";
-import { supabase } from "./supabaseClient";
-import { fetchPublishedPosts } from "./postsApi";
+import { fetchPublishedPosts, fetchPostDaysAndImages } from "./postsApi";
 import { usePostBody } from "./usePostBody";
 import { useTheme } from "./useTheme";
 import { responsiveImage, IMG } from "./images";
 import { pathFor, postKey, navigateTo, cameFromApp, linkProps } from "./router";
 import { setPageMeta } from "./head";
-import { postText, formatMonth } from "./content";
+import { postText, formatMonth, dayAnchor } from "./content";
 import { CONTACT_EMAIL } from "./config";
 import SiteHeader from "./components/SiteHeader";
 import AboutPage from "./components/AboutPage";
 import PrivacyPage from "./components/PrivacyPage";
+import ArticleDays from "./components/ArticleDays";
+import Lightbox from "./components/Lightbox";
 
 const CAROUSEL_INTERVAL = 4500;
 const PAGE_SIZE = 6;
@@ -38,10 +39,12 @@ export default function TravelBlog({ route }) {
   // cambiano, la pagina torna a 1 senza bisogno di un effect.
   const [pageState,       setPageState]      = useState({ key: "all|all", page: 1 });
 
-  // immagini della galleria dell'articolo aperto (marcate con il post a cui appartengono)
-  const [galleryData, setGalleryData] = useState({ postId: null, images: [] });
-  const [galleryIdx,  setGalleryIdx]  = useState(0);
-  const [galleryOpen, setGalleryOpen] = useState(false);
+  // giorni e foto dell'articolo aperto (marcati con il post a cui appartengono)
+  const [extra, setExtra] = useState({ postId: null, days: [], images: [] });
+  // foto a schermo intero: elenco mostrato e indice corrente (null = chiuso)
+  const [lightbox, setLightbox] = useState(null);
+  const galleryOpen = !!lightbox;
+  const setGalleryOpen = (open) => { if (!open) setLightbox(null); };
 
   // Pagina e articolo aperto derivano dall'URL (route), non da stato interno:
   // /articoli/<slug> = blog con l'articolo aperto; indietro/avanti funzionano.
@@ -50,7 +53,9 @@ export default function TravelBlog({ route }) {
   const selectedPost = articleSlug ? (posts.find(p => postKey(p) === articleSlug) || null) : null;
   const articleMissing = !!articleSlug && !loading && !error && !selectedPost;
   const pageNotFound = route.name === "notfound";
-  const postImages = selectedPost && galleryData.postId === selectedPost.id ? galleryData.images : [];
+  const loaded = selectedPost && extra.postId === selectedPost.id;
+  const postDays = loaded ? extra.days : [];
+  const postImages = loaded ? extra.images : [];
   // articolo aperto con testo completo (caricato solo all'apertura)
   const [openPost, bodyStatus] = usePostBody(selectedPost);
 
@@ -75,22 +80,34 @@ export default function TravelBlog({ route }) {
     })();
   }, []);
 
-  // immagini della galleria quando si apre un articolo
+  // giorni e foto quando si apre un articolo
   useEffect(() => {
     if (!selectedPost) return;
     let cancelled = false; // ignora risposte di un post gia' chiuso o sostituito
-    (async () => {
-      const { data, error } = await supabase
-        .from("post_images")
-        .select("*")
-        .eq("post_id", selectedPost.id)
-        .order("position", { ascending: true });
-      if (!cancelled) {
-        setGalleryData({ postId: selectedPost.id, images: error ? [] : (data || []) });
-      }
-    })();
+    fetchPostDaysAndImages(selectedPost.id).then(({ days, images }) => {
+      if (!cancelled) setExtra({ postId: selectedPost.id, days, images });
+    });
     return () => { cancelled = true; };
   }, [selectedPost]);
+
+  // Vai al giorno N dentro la finestra dell'articolo e aggiorna #giorno-N nell'URL
+  // (replaceState: non aggiunge passi alla cronologia).
+  const jumpToDay = useCallback((n, { smooth = true } = {}) => {
+    const el = document.getElementById(dayAnchor(n));
+    if (!el) return;
+    el.scrollIntoView({ behavior: smooth && !reducedMotion ? "smooth" : "auto", block: "start" });
+    const url = window.location.pathname + "#" + dayAnchor(n);
+    window.history.replaceState(window.history.state, "", url);
+  }, [reducedMotion]);
+
+  // Link diretto a un giorno (/articoli/<slug>#giorno-3): quando i giorni sono
+  // caricati si scorre fino a quel giorno.
+  const daysReady = loaded && postDays.length > 0;
+  useEffect(() => {
+    if (!daysReady) return;
+    const m = window.location.hash.match(/^#giorno-(\d+)$/);
+    if (m) requestAnimationFrame(() => jumpToDay(Number(m[1]), { smooth: false }));
+  }, [daysReady, jumpToDay]);
 
   // blocca lo scroll della pagina con articolo o menu aperti
   useEffect(() => {
@@ -272,7 +289,7 @@ export default function TravelBlog({ route }) {
                             inert={!visible}
                             onClick={() => openArticle(post)}
                           >
-                            <img {...responsiveImage(post.image_url, ...IMG.hero)} alt=""
+                            <img {...responsiveImage(post.image_url, ...IMG.hero, post.image_thumb_url)} alt=""
                               width="1200" height="520" decoding="async"
                               loading={i === 0 ? "eager" : "lazy"}
                               fetchPriority={i === 0 ? "high" : "auto"} />
@@ -361,7 +378,7 @@ export default function TravelBlog({ route }) {
                   return (
                     <article key={post.id} className="card" onClick={() => openArticle(post)}>
                       <div className="card-img-wrap">
-                        <img {...responsiveImage(post.image_url, ...IMG.card)} alt=""
+                        <img {...responsiveImage(post.image_url, ...IMG.card, post.image_thumb_url)} alt=""
                           width="400" height="215" loading="lazy" decoding="async" />
                       </div>
                       <div className="card-cat">{tr.destination} · {t(`categories.${post.category}`)}</div>
@@ -460,7 +477,7 @@ export default function TravelBlog({ route }) {
               ref={modalRef}
               onClick={e => e.stopPropagation()}
             >
-              <img className="modal-hero-img" {...responsiveImage(post.image_url, ...IMG.modal)} alt=""
+              <img className="modal-hero-img" {...responsiveImage(post.image_url, ...IMG.modal, post.image_thumb_url)} alt=""
                 width="720" height="300" decoding="async" />
               <div className="modal-body">
                 <div className="modal-cat">{tr.destination} · {t(`categories.${post.category}`)}</div>
@@ -475,24 +492,13 @@ export default function TravelBlog({ route }) {
                 {bodyStatus === "error" && <p className="modal-text modal-status" role="alert">{t("modal.errorText")}</p>}
                 {bodyStatus === "ready" && <p className="modal-text">{tr.body}</p>}
 
-                {postImages.length > 0 && (
-                  <section className="gallery" aria-label={t("a11y.gallery")}>
-                    <h2 className="gallery-title">{t("gallery.title", { count: postImages.length })}</h2>
-                    <div className="gallery-grid">
-                      {postImages.map((img, i) => (
-                        <button
-                          key={img.id}
-                          className="gallery-thumb"
-                          aria-label={img.alt_text || img.caption || t("a11y.openPhoto", { n: i + 1 })}
-                          onClick={() => { setGalleryIdx(i); setGalleryOpen(true); }}
-                        >
-                          <img src={img.url} alt="" loading="lazy" />
-                          <span className="gallery-thumb-overlay" aria-hidden="true">⊕</span>
-                        </button>
-                      ))}
-                    </div>
-                  </section>
-                )}
+                <ArticleDays
+                  days={postDays}
+                  images={postImages}
+                  lang={lang}
+                  onOpenPhotos={(photos, index) => setLightbox({ photos, index })}
+                  onJump={(n) => jumpToDay(n)}
+                />
 
                 <button className="modal-close" onClick={closeArticle}>{t("modal.back")}</button>
               </div>
@@ -502,30 +508,15 @@ export default function TravelBlog({ route }) {
       })()}
 
       {/* ── LIGHTBOX ── */}
-      {galleryOpen && postImages.length > 0 && (() => {
-        const img = postImages[galleryIdx];
-        const goPrev = (e) => { e.stopPropagation(); setGalleryIdx(i => (i - 1 + postImages.length) % postImages.length); };
-        const goNext = (e) => { e.stopPropagation(); setGalleryIdx(i => (i + 1) % postImages.length); };
-        return (
-          <div className="lightbox" role="dialog" aria-modal="true" aria-label={t("a11y.gallery")} onClick={() => setGalleryOpen(false)}>
-            <button className="lightbox-close" aria-label={t("a11y.closeGallery")} autoFocus
-              onClick={() => setGalleryOpen(false)}><span aria-hidden="true">✕</span></button>
-            <div className="lightbox-img-wrap" onClick={e => e.stopPropagation()}>
-              {postImages.length > 1 && (
-                <button className="lightbox-nav lb-prev" aria-label={t("a11y.prevPhoto")} onClick={goPrev}><span aria-hidden="true">&#8592;</span></button>
-              )}
-              <img className="lightbox-img" src={img.url} alt={img.alt_text || img.caption || ""} />
-              {postImages.length > 1 && (
-                <button className="lightbox-nav lb-next" aria-label={t("a11y.nextPhoto")} onClick={goNext}><span aria-hidden="true">&#8594;</span></button>
-              )}
-            </div>
-            {img.caption && <p className="lightbox-caption">{img.caption}</p>}
-            {postImages.length > 1 && (
-              <p className="lightbox-counter">{galleryIdx + 1} / {postImages.length}</p>
-            )}
-          </div>
-        );
-      })()}
+      {lightbox && (
+        <Lightbox
+          photos={lightbox.photos}
+          index={lightbox.index}
+          setIndex={(index) => setLightbox(l => ({ ...l, index }))}
+          onClose={() => setLightbox(null)}
+          lang={lang}
+        />
+      )}
     </div>
   );
 }

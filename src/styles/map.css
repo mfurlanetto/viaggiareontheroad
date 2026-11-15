@@ -182,3 +182,6 @@ button.side-card {
 /* Attribuzione della mappa leggibile anche sopra i tile scuriti del tema scuro */
 .leaflet-container .leaflet-control-attribution { background: #ffffff; color: #333333; }
 .leaflet-container .leaflet-control-attribution a { color: #005a85; }
+
+.map-popup-route { font-size: 0.78rem; color: #d4b05a; margin: -0.3rem 0 0.6rem; }
+.side-card[aria-pressed="true"] .side-card-title { color: var(--gold); }
