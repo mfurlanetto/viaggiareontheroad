@@ -85,7 +85,7 @@ export function linkProps(path, onNavigate) {
       if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
       e.preventDefault();
       e.stopPropagation(); // es. link dentro una card che e' a sua volta cliccabile
-      if (onNavigate) onNavigate(); else navigateTo(path);
+      if (onNavigate) onNavigate(e); else navigateTo(path);
     },
   };
 }

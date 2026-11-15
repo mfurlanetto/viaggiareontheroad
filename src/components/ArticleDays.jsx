@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { photoImage, photoText } from "../images";
 import { formatMonth, dayAnchor } from "../content";
@@ -20,7 +21,7 @@ function PhotoGrid({ photos, lang, label, onOpen }) {
       {photos.map((img, i) => {
         const { alt, caption } = photoText(img, lang);
         return (
-          <li key={img.id}><button
+          <li key={img.id} className="reveal" style={{ "--reveal-delay": `${(i % 3) * 70}ms` }}><button
             className="gallery-thumb"
             aria-label={alt || caption || t("a11y.openPhoto", { n: i + 1 })}
             onClick={() => onOpen(photos, i)}
@@ -37,8 +38,29 @@ function PhotoGrid({ photos, lang, label, onOpen }) {
 
 // Viaggio diviso per giorni: indice, poi per ogni giorno copertina, testo e
 // galleria. Le foto senza giorno restano in una galleria generale in fondo.
-export default function ArticleDays({ days, images, lang, onOpenPhotos, onJump }) {
+// Giorno che si sta leggendo: l'ultimo la cui sezione ha superato il primo
+// terzo della finestra dell'articolo (scrollRoot = contenitore che scorre).
+function useCurrentDay(days, scrollRoot) {
+  const [current, setCurrent] = useState(null);
+  const key = days.map(d => d.day_number).join(",");
+  useEffect(() => {
+    const root = scrollRoot?.current;
+    if (!root || !key || !("IntersectionObserver" in window)) return;
+    const visible = new Map();
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) visible.set(Number(e.target.dataset.day), e.isIntersecting);
+      const on = [...visible].filter(([, v]) => v).map(([n]) => n);
+      setCurrent(on.length ? Math.min(...on) : null);
+    }, { root, rootMargin: "0px 0px -66% 0px" });
+    root.querySelectorAll("section.day[data-day]").forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, [key, scrollRoot]);
+  return current;
+}
+
+export default function ArticleDays({ days, images, lang, onOpenPhotos, onJump, scrollRoot }) {
   const { t } = useTranslation();
+  const currentDay = useCurrentDay(days, scrollRoot);
   const byDay = new Map();
   for (const img of images) {
     if (!img.day_id) continue;
@@ -58,7 +80,9 @@ export default function ArticleDays({ days, images, lang, onOpenPhotos, onJump }
               const title = pick(d, "title", lang);
               return (
                 <li key={d.id}>
-                  <a href={`#${dayAnchor(d.day_number)}`} onClick={(e) => { e.preventDefault(); onJump(d.day_number); }}>
+                  <a href={`#${dayAnchor(d.day_number)}`} onClick={(e) => { e.preventDefault(); onJump(d.day_number); }}
+                    className={currentDay === d.day_number ? "current" : undefined}
+                    aria-current={currentDay === d.day_number ? "location" : undefined}>
                     <span className="days-toc-n">{t("days.day", { n: d.day_number })}</span>
                     {(title || place) && <span className="days-toc-label">{title || place}</span>}
                   </a>
@@ -78,7 +102,7 @@ export default function ArticleDays({ days, images, lang, onOpenPhotos, onJump }
         const body = pick(d, "body", lang);
         const coverText = cover ? photoText(cover, lang) : null;
         return (
-          <section key={d.id} className="day" id={dayAnchor(d.day_number)} aria-labelledby={`${dayAnchor(d.day_number)}-title`}>
+          <section key={d.id} className="day" data-day={d.day_number} id={dayAnchor(d.day_number)} aria-labelledby={`${dayAnchor(d.day_number)}-title`}>
             <h2 className="day-title" id={`${dayAnchor(d.day_number)}-title`}>
               <span className="day-n">{t("days.day", { n: d.day_number })}</span>
               {title && <span className="day-name">{title}</span>}
@@ -91,7 +115,7 @@ export default function ArticleDays({ days, images, lang, onOpenPhotos, onJump }
               </p>
             )}
             {cover && (
-              <figure className="day-cover">
+              <figure className="day-cover reveal">
                 <button className="day-cover-btn" onClick={() => onOpenPhotos(photos, photos.indexOf(cover))}
                   aria-label={coverText.alt || coverText.caption || t("a11y.openPhoto", { n: 1 })}>
                   <img {...photoImage(cover, "(max-width: 760px) 100vw, 660px")} alt="" loading="lazy" decoding="async"
@@ -100,7 +124,7 @@ export default function ArticleDays({ days, images, lang, onOpenPhotos, onJump }
                 {coverText.caption && <figcaption>{coverText.caption}</figcaption>}
               </figure>
             )}
-            {body && <p className="modal-text day-text">{body}</p>}
+            {body && <p className="modal-text day-text reveal">{body}</p>}
             <PhotoGrid photos={rest} lang={lang} label={t("days.photos", { n: d.day_number })}
               onOpen={(list, i) => onOpenPhotos(photos, photos.indexOf(list[i]))} />
           </section>

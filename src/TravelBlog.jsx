@@ -14,6 +14,8 @@ import AboutPage from "./components/AboutPage";
 import PrivacyPage from "./components/PrivacyPage";
 import ArticleDays from "./components/ArticleDays";
 import Lightbox from "./components/Lightbox";
+import { withViewTransition } from "./motion";
+import { useReveal } from "./reveal";
 
 const CAROUSEL_INTERVAL = 4500;
 const PAGE_SIZE = 6;
@@ -100,6 +102,15 @@ export default function TravelBlog({ route }) {
     window.history.replaceState(window.history.state, "", url);
   }, [reducedMotion]);
 
+  // Barra di avanzamento della lettura: aggiornata con transform (niente
+  // re-render di React a ogni scroll).
+  const progressRef = useRef(null);
+  const onModalScroll = (e) => {
+    const el = e.currentTarget;
+    const max = el.scrollHeight - el.clientHeight;
+    if (progressRef.current) progressRef.current.style.transform = `scaleX(${max > 0 ? el.scrollTop / max : 0})`;
+  };
+
   // Link diretto a un giorno (/articoli/<slug>#giorno-3): quando i giorni sono
   // caricati si scorre fino a quel giorno.
   const daysReady = loaded && postDays.length > 0;
@@ -149,7 +160,27 @@ export default function TravelBlog({ route }) {
     window.scrollTo({ top: 0, behavior: "instant" });
   };
 
-  const openArticle = (post) => navigateTo(pathFor.article(lang, postKey(post)));
+  // Foto da cui parte l'articolo (card o carosello) e anteprima gia' in cache,
+  // usata come sfondo della copertina finche' l'immagine grande non e' pronta.
+  const [heroPlaceholder, setHeroPlaceholder] = useState(null);
+
+  // Apertura con "morph": la foto cliccata si trasforma nella copertina
+  // dell'articolo (View Transitions). Dove non e' supportato, apertura normale.
+  const openArticle = (post, e) => {
+    const path = pathFor.article(lang, postKey(post));
+    const img = e?.currentTarget?.closest?.(".card, .carousel-slide")?.querySelector("img");
+    setHeroPlaceholder(img?.currentSrc || null);
+    withViewTransition(() => {
+      if (img) img.style.viewTransitionName = ""; // il nome passa alla copertina dell'articolo
+      navigateTo(path);
+    }, {
+      kind: "article",
+      prepare: () => { if (img) img.style.viewTransitionName = "article-hero"; },
+      cleanup: () => { if (img) img.style.viewTransitionName = ""; },
+    });
+  };
+  // Filtri con transizione: le card restanti scorrono nella nuova posizione.
+  const changeFilter = (setter, value) => withViewTransition(() => setter(value), { kind: "filter" });
   // Chiudere un articolo aperto dall'interno del sito torna indietro nella
   // cronologia (conserva lo scroll); se si e' arrivati direttamente dal link,
   // si sostituisce l'URL con la home.
@@ -200,6 +231,9 @@ export default function TravelBlog({ route }) {
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const safePage   = Math.min(currentPage, totalPages);
   const paginated  = filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE);
+
+  // Comparsa allo scorrimento di card, giorni e foto ogni volta che cambiano.
+  useReveal([page, loading, filterKey, safePage, lang, extra.postId, articleSlug]);
 
   const goToPage = (p) => {
     setPageState({ key: filterKey, page: p });
@@ -274,20 +308,21 @@ export default function TravelBlog({ route }) {
                     onTouchStart={onTouchStart}
                     onTouchEnd={onTouchEnd}
                   >
-                    <div className="carousel-track" style={{ transform: `translateX(-${carouselIdx * 100}%)` }}>
+                    <div className="carousel-track">
                       {carouselPosts.map((post, i) => {
                         const tr = postText(post, lang);
                         const visible = i === carouselIdx;
                         return (
                           <div
                             key={post.id}
-                            className="carousel-slide"
+                            className={`carousel-slide${visible ? " active" : ""}`}
+                            style={{ "--kb-duration": `${CAROUSEL_INTERVAL + 1200}ms` }}
                             role="group"
                             aria-roledescription="slide"
                             aria-label={`${i + 1} / ${carouselPosts.length}`}
                             aria-hidden={!visible}
                             inert={!visible}
-                            onClick={() => openArticle(post)}
+                            onClick={(e) => openArticle(post, e)}
                           >
                             <img {...responsiveImage(post.image_url, ...IMG.hero, post.image_thumb_url)} alt=""
                               width="1200" height="520" decoding="async"
@@ -296,7 +331,7 @@ export default function TravelBlog({ route }) {
                             <div className="hero-overlay">
                               <span className="hero-tag">{tr.destination} · {t(`categories.${post.category}`)}</span>
                               <h2 className="hero-title">
-                                <a {...linkProps(pathFor.article(lang, postKey(post)), () => openArticle(post))}>{tr.title}</a>
+                                <a {...linkProps(pathFor.article(lang, postKey(post)), (e) => openArticle(post, e))}>{tr.title}</a>
                               </h2>
                               <p className="hero-subtitle">{tr.subtitle}</p>
                               <span className="hero-meta">{formatMonth(post.date, lang)} · {post.read_time} {t("hero.readTime")}</span>
@@ -352,7 +387,7 @@ export default function TravelBlog({ route }) {
                       key={c}
                       className={`filter-btn${activeContinent === c ? " active" : ""}`}
                       aria-pressed={activeContinent === c}
-                      onClick={() => setActiveContinent(c)}
+                      onClick={() => changeFilter(setActiveContinent, c)}
                     >{t(`continents.${c}`)}</button>
                   ))}
                 </div>
@@ -364,7 +399,7 @@ export default function TravelBlog({ route }) {
                       key={c}
                       className={`filter-btn${activeCategory === c ? " active" : ""}`}
                       aria-pressed={activeCategory === c}
-                      onClick={() => setActiveCategory(c)}
+                      onClick={() => changeFilter(setActiveCategory, c)}
                     >{t(`categories.${c}`)}</button>
                   ))}
                 </div>
@@ -373,17 +408,18 @@ export default function TravelBlog({ route }) {
               {/* GRIGLIA */}
               <div className="grid" ref={gridRef} aria-live="polite">
                 {filtered.length === 0 && <div className="empty">{t("empty")}</div>}
-                {paginated.map(post => {
+                {paginated.map((post, i) => {
                   const tr = postText(post, lang);
                   return (
-                    <article key={post.id} className="card" onClick={() => openArticle(post)}>
+                    <article key={post.id} className="card reveal" onClick={(e) => openArticle(post, e)}
+                      style={{ "--reveal-delay": `${(i % 3) * 80}ms`, "--vt-card": `card-${post.id}` }}>
                       <div className="card-img-wrap">
                         <img {...responsiveImage(post.image_url, ...IMG.card, post.image_thumb_url)} alt=""
                           width="400" height="215" loading="lazy" decoding="async" />
                       </div>
                       <div className="card-cat">{tr.destination} · {t(`categories.${post.category}`)}</div>
                       <h3 className="card-title">
-                        <a {...linkProps(pathFor.article(lang, postKey(post)), () => openArticle(post))}>{tr.title}</a>
+                        <a {...linkProps(pathFor.article(lang, postKey(post)), (e) => openArticle(post, e))}>{tr.title}</a>
                       </h3>
                       <p className="card-subtitle">{tr.subtitle}</p>
                       <p className="card-excerpt">{tr.excerpt}</p>
@@ -476,9 +512,12 @@ export default function TravelBlog({ route }) {
               tabIndex={-1}
               ref={modalRef}
               onClick={e => e.stopPropagation()}
+              onScroll={onModalScroll}
             >
+              <div className="read-progress" aria-hidden="true"><span ref={progressRef} /></div>
               <img className="modal-hero-img" {...responsiveImage(post.image_url, ...IMG.modal, post.image_thumb_url)} alt=""
-                width="720" height="300" decoding="async" />
+                width="720" height="300" decoding="async"
+                style={{ viewTransitionName: "article-hero", backgroundImage: heroPlaceholder ? `url("${heroPlaceholder}")` : undefined }} />
               <div className="modal-body">
                 <div className="modal-cat">{tr.destination} · {t(`categories.${post.category}`)}</div>
                 <h1 className="modal-title" id="article-title">{tr.title}</h1>
@@ -498,6 +537,7 @@ export default function TravelBlog({ route }) {
                   lang={lang}
                   onOpenPhotos={(photos, index) => setLightbox({ photos, index })}
                   onJump={(n) => jumpToDay(n)}
+                  scrollRoot={modalRef}
                 />
 
                 <button className="modal-close" onClick={closeArticle}>{t("modal.back")}</button>
