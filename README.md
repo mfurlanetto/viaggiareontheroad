@@ -75,8 +75,9 @@ e testo dell'articolo, piu' `sitemap.xml` (con le alternative per lingua) e
 deploy precedente.
 
 Quando un post pubblicato cambia (o ne viene pubblicato uno nuovo), un trigger
-in Supabase segna il sito come da ricostruire; un job `pg_cron` ogni minuto, se
-l'ultima modifica ha piu' di 45 secondi, chiama il Deploy Hook di Vercel. Il sito
+in Supabase segna il sito come da ricostruire e crea un job `pg_cron`; il job,
+dopo 45 secondi senza altre modifiche, chiama il Deploy Hook di Vercel e si
+cancella. A riposo non gira nulla (niente consumo di Disk IO). Il sito
 si aggiorna in circa due minuti. L'URL del Deploy Hook e' salvato nel Vault di
 Supabase (segreto `vercel_deploy_hook`), non nel repository. Stato e ultimo
 invio: `select * from private.site_rebuild;` nel SQL editor.
