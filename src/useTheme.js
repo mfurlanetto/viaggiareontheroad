@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { withViewTransition } from "./motion";
 
 // localStorage puo' lanciare eccezioni (modalita' privata, storage bloccato):
 // in quel caso il tema funziona comunque, solo senza essere ricordato.
@@ -34,8 +35,13 @@ export function useTheme() {
     return () => mq.removeEventListener("change", handler);
   }, [state.explicit]);
 
-  const toggle = () =>
-    setState(s => ({ theme: s.theme === "dark" ? "light" : "dark", explicit: true }));
+  // Cambio tema con dissolvenza (View Transition) dove supportata.
+  // L'attributo si imposta subito, cosi' la "foto" finale ha gia' i colori nuovi.
+  const toggle = () => withViewTransition(() => {
+    const next = state.theme === "dark" ? "light" : "dark";
+    document.documentElement.setAttribute("data-theme", next);
+    setState({ theme: next, explicit: true });
+  }, { kind: "theme" });
 
   return { theme: state.theme, toggle };
 }

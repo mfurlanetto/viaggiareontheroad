@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { MapContainer, TileLayer, Marker, Popup, Polyline, CircleMarker, Tooltip, useMap } from "react-leaflet";
 import L from "leaflet";
@@ -14,6 +14,7 @@ import { pathFor, postKey, navigateTo, linkProps } from "./router";
 import { setPageMeta } from "./head";
 import { postText, formatMonth } from "./content";
 import SiteHeader from "./components/SiteHeader";
+import { prefersReducedMotion } from "./motion";
 
 const CATEGORY_COLORS = {
   culture: "#c9a84c", adventure: "#e07b4a",
@@ -50,6 +51,67 @@ function MapFlyTo({ target }) {
     else map.flyTo(target.coords, 5, { duration: 1.2 });
   }, [target, map]);
   return null;
+}
+
+// Percorso di un viaggio: la linea si "disegna" e le tappe compaiono in
+// sequenza, a volo della mappa concluso. Con "riduci movimento" tutto subito.
+function RouteLayer({ stops, renderTooltip }) {
+  const map = useMap();
+  const lineRef = useRef(null);
+  const dotRefs = useRef([]);
+  const key = stops.map(s => `${s.post_id}-${s.day_number}`).join("|");
+
+  useEffect(() => {
+    const line = lineRef.current?.getElement?.();
+    const dots = dotRefs.current.map(r => r?.getElement?.()).filter(Boolean);
+    line?.classList.add("route-line"); // react-leaflet non applica className da pathOptions
+    if (prefersReducedMotion() || !dots.length) return;
+    dots.forEach(d => { d.style.opacity = "0"; });
+    if (line) line.style.opacity = "0";
+    let started = false;
+    let cleanupTimer = null;
+    const start = () => {
+      if (started) return;
+      started = true;
+      if (line) {
+        const len = line.getTotalLength();
+        line.style.strokeDasharray = `${len}`;
+        line.style.strokeDashoffset = `${len}`;
+        line.style.opacity = "1";
+        line.getBoundingClientRect(); // applica lo stato iniziale prima della transizione
+        line.style.transition = "stroke-dashoffset 1.4s ease-in-out";
+        line.style.strokeDashoffset = "0";
+        // fine disegno: linea piena (anche se la mappa viene zoomata dopo)
+        const done = () => { line.style.strokeDasharray = ""; line.style.strokeDashoffset = ""; line.style.transition = ""; };
+        line.addEventListener("transitionend", done, { once: true });
+        cleanupTimer = setTimeout(done, 1600);
+      }
+      const step = 1.2 / Math.max(1, dots.length - 1);
+      dots.forEach((d, i) => {
+        d.style.transition = `opacity 0.35s ease ${(0.15 + i * step).toFixed(2)}s`;
+        d.style.opacity = "1";
+      });
+    };
+    map.once("moveend", start);
+    const fallback = setTimeout(start, 1600); // se la mappa non si muove
+    return () => { clearTimeout(fallback); clearTimeout(cleanupTimer); map.off("moveend", start); };
+  }, [key, map]);
+
+  return (
+    <>
+      {stops.length > 1 && (
+        <Polyline ref={lineRef} positions={stops.map(s => [s.lat, s.lng])}
+          pathOptions={{ color: "#d4a843", weight: 3, opacity: 0.95 }} />
+      )}
+      {stops.map((s, i) => (
+        <CircleMarker key={`${s.post_id}-${s.day_number}`} ref={el => { dotRefs.current[i] = el; }}
+          center={[s.lat, s.lng]} radius={7}
+          pathOptions={{ color: "#1a1a18", weight: 2, fillColor: "#d4a843", fillOpacity: 1 }}>
+          <Tooltip direction="top">{renderTooltip(s)}</Tooltip>
+        </CircleMarker>
+      ))}
+    </>
+  );
 }
 
 // Coordinate salvate nel DB (colonne lat/lng). Un post senza coordinate
@@ -190,18 +252,10 @@ export default function TravelMap({ route }) {
                   />
                   <MapFlyTo target={flyTarget} />
                   {/* Percorso del viaggio selezionato, giorno per giorno */}
-                  {activeStops.length > 1 && (
-                    <Polyline positions={activeStops.map(s => [s.lat, s.lng])}
-                      pathOptions={{ color: "#d4a843", weight: 3, dashArray: "6 8", opacity: 0.9 }} />
+                  {activeStops.length > 0 && (
+                    <RouteLayer key={activePostId} stops={activeStops}
+                      renderTooltip={(s) => `${t("map.stop", { n: s.day_number })}${pick(s, "place") ? ` · ${pick(s, "place")}` : ""}`} />
                   )}
-                  {activeStops.map(s => (
-                    <CircleMarker key={`${s.post_id}-${s.day_number}`} center={[s.lat, s.lng]} radius={7}
-                      pathOptions={{ color: "#1a1a18", weight: 2, fillColor: "#d4a843", fillOpacity: 1 }}>
-                      <Tooltip direction="top">
-                        {t("map.stop", { n: s.day_number })}{pick(s, "place") ? ` · ${pick(s, "place")}` : ""}
-                      </Tooltip>
-                    </CircleMarker>
-                  ))}
                   {filtered.map(post => {
                     const coords = getCoords(post);
                     const tr     = postText(post, lang);
